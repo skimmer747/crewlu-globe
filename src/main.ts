@@ -1,2 +1,5 @@
+import './styles.css'
+import { requireSession } from './auth/authView'
 const app = document.querySelector<HTMLDivElement>('#app')!
-app.textContent = 'Flight Globe — scaffold OK'
+await requireSession(app)
+app.textContent = 'Signed in ✓ (globe goes here)'
