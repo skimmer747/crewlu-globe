@@ -7,6 +7,7 @@ import { flightsToLegs, statsFor } from './data/transform'
 import { groupIntoTrips } from './data/trips'
 import { beaconHome, defaultWindow, legsInWindow, splitAtPlayhead } from './data/schedule'
 import { slerp } from './astro/geo'
+import { geoToCartesian } from './globe/occlusion'
 import { createGlobeScene } from './globe/globeScene'
 import { configureArcs, setArcs } from './globe/arcsLayer'
 import { createMoonLayer } from './globe/moonLayer'
@@ -68,7 +69,34 @@ async function run() {
     account,
     onSignOut: async () => { await supabase.auth.signOut(); location.reload() },
   })
-  scene.onCameraChange(() => { moon.refreshOcclusion(scene.cameraPos()); beacon.refreshOcclusion(scene.cameraPos()) })
+  // Clip the Moon by the Earth's on-screen edge so it gets covered as it passes behind the limb.
+  // (The Moon is a DOM overlay, so it can't be depth-occluded — we hide the part over the Earth disk.)
+  const applyMoonOcclusion = () => {
+    const cam = scene.cameraPos()
+    const camDist = Math.hypot(cam.x, cam.y, cam.z)
+    const m = geoToCartesian(moon.datum.lat, moon.datum.lng, moon.datum.alt, 100)
+    const dx = m.x - cam.x, dy = m.y - cam.y, dz = m.z - cam.z
+    const len = Math.hypot(dx, dy, dz) || 1
+    const ux = dx / len, uy = dy / len, uz = dz / len
+    const tStar = -(cam.x * ux + cam.y * uy + cam.z * uz) // perpendicular foot from Earth center onto the ray
+    if (!(tStar > 0 && tStar < len) || camDist <= 100) { moon.el.style.clipPath = 'none'; return } // Moon in front -> no clip
+    const W = viewport.clientWidth, H = viewport.clientHeight
+    const alpha = Math.asin(Math.min(1, 100 / camDist))
+    const fov = ((scene.globe.camera?.()?.fov) ?? 50) * Math.PI / 180
+    const Rs = (H / 2) * Math.tan(alpha) / Math.tan(fov / 2) // Earth's silhouette radius on screen (px)
+    const ms = scene.globe.getScreenCoords(moon.datum.lat, moon.datum.lng, moon.datum.alt)
+    let rx = ms.x - W / 2, ry = ms.y - H / 2
+    const dm = Math.hypot(rx, ry) || 1
+    rx /= dm; ry /= dm // unit radial: Earth center -> Moon, in screen space
+    const Lx = 42 + rx * (Rs - dm), Ly = 42 + ry * (Rs - dm) // limb line point in the Moon element's local px (84x84, center 42,42)
+    const px = -ry, py = rx, S = 600 // keep the half-plane outside the Earth disk (the +radial side)
+    const pts = [
+      [Lx + px * S, Ly + py * S], [Lx - px * S, Ly - py * S],
+      [Lx - px * S + rx * S * 2, Ly - py * S + ry * S * 2], [Lx + px * S + rx * S * 2, Ly + py * S + ry * S * 2],
+    ].map(([x, y]) => `${x.toFixed(1)}px ${y.toFixed(1)}px`).join(', ')
+    moon.el.style.clipPath = `polygon(${pts})`
+  }
+  scene.onCameraChange(() => { applyMoonOcclusion(); beacon.refreshOcclusion(scene.cameraPos()) })
   hud.onCenterTap(() => { scene.globe.controls().autoRotate = false; scene.globe.pointOfView({ lat: beacon.pos.lat, lng: beacon.pos.lng, altitude: 1.7 }, 950) })
 
   // FIX 6: starfield parallax — drifts at a smaller depth than the globe tilt
@@ -118,7 +146,7 @@ async function run() {
     scene.setSun(new Date(playhead))
     moon.update(new Date(playhead))
     scene.globe.htmlElementsData([moon.datum, beacon.datum])
-    moon.refreshOcclusion(scene.cameraPos()); beacon.refreshOcclusion(scene.cameraPos())
+    applyMoonOcclusion(); beacon.refreshOcclusion(scene.cameraPos())
     hud.setMoment(positionAt(playhead).label, fmtDateTime(playhead))
   }
 
