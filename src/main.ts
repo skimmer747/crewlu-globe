@@ -113,6 +113,8 @@ async function run() {
 
   const dock = createTimelineDock({ legs, trips, windowStart: win.start, windowEnd: win.end, playhead })
 
+  // Camera zoom tracks leg length: short hops zoom way in, long hauls pull out (lower altitude = closer).
+  const altForLeg = (miles: number) => Math.min(2.6, Math.max(0.6, 0.6 + miles * 0.00033))
   const playback = createPlayback({
     legs: () => legsInWindow(legs, { start: win.start, end: win.end }),
     trips: () => trips,
@@ -120,10 +122,15 @@ async function run() {
     baseLegMs: 1200,
     baseDwellMs: 500,
     onReveal: () => { /* arcs are rebuilt by draw() when solid-count changes */ },
-    onFly: (leg) => beacon.flyLeg(leg, Math.max(200, 1200 / SPEEDS[dock.state.speedIndex])),
+    onFly: (leg) => {
+      const dur = Math.max(200, 1200 / SPEEDS[dock.state.speedIndex])
+      beacon.flyLeg(leg, dur)
+      // camera follows the plane to its arrival, zoomed to the leg's length
+      scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, dur)
+    },
     onPlayhead: (ms) => { playhead = ms; dock.setPlayhead(ms); draw(false) },
     onDone: () => { dock.setPlaying(false); draw() },
-    onPlayingChange: (p) => { dock.setPlaying(p); draw() },
+    onPlayingChange: (p) => { dock.setPlaying(p); if (p) scene.globe.controls().autoRotate = false; draw() },
   })
 
   dock.onPlayToggle(() => playback.toggle())
