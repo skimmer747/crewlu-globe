@@ -24,6 +24,34 @@ export interface TimeAxis {
   xToDate(x: number): number
 }
 
+export const MIN_TICK_DX = 0.045
+const MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
+
+function monthStarts(start: number, end: number): number[] {
+  const out: number[] = []
+  const d = new Date(start)
+  let y = d.getUTCFullYear(), m = d.getUTCMonth()
+  if (Date.UTC(y, m, 1) < start) { m++; if (m > 11) { m = 0; y++ } }
+  for (let ms = Date.UTC(y, m, 1); ms <= end; ) {
+    out.push(ms)
+    m++; if (m > 11) { m = 0; y++ }
+    ms = Date.UTC(y, m, 1)
+  }
+  return out
+}
+function yearStarts(start: number, end: number): number[] {
+  const out: number[] = []
+  let y = new Date(start).getUTCFullYear()
+  if (Date.UTC(y, 0, 1) < start) y++
+  for (let ms = Date.UTC(y, 0, 1); ms <= end; y++, ms = Date.UTC(y, 0, 1)) out.push(ms)
+  return out
+}
+function weekStarts(start: number, end: number): number[] {
+  const out: number[] = []
+  for (let ms = Math.ceil(start / (7 * DAY)) * (7 * DAY); ms <= end; ms += 7 * DAY) out.push(ms)
+  return out
+}
+
 export function gapLabel(ms: number): string {
   const days = ms / DAY
   if (days < 14) return `${Math.max(1, Math.round(days))}d off`
@@ -95,5 +123,26 @@ export function buildAxis(domainStart: number, domainEnd: number, trips: Trip[],
     return domainEnd
   }
 
-  return { domainStart, domainEnd, pieces, gaps, ticks: [], dateToX, xToDate }
+  const spanDays = (domainEnd - domainStart) / DAY
+  let raw_ticks: { ms: number; label: string }[]
+  if (spanDays <= 45) {
+    raw_ticks = weekStarts(domainStart, domainEnd).map((ms) => {
+      const d = new Date(ms); return { ms, label: `${d.getUTCDate()} ${MON[d.getUTCMonth()]}` }
+    })
+  } else if (spanDays <= 18 * 30) {
+    const multiYear = new Date(domainStart).getUTCFullYear() !== new Date(domainEnd).getUTCFullYear()
+    raw_ticks = monthStarts(domainStart, domainEnd).map((ms) => {
+      const d = new Date(ms)
+      return { ms, label: multiYear ? `${MON[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}` : MON[d.getUTCMonth()] }
+    })
+  } else {
+    raw_ticks = yearStarts(domainStart, domainEnd).map((ms) => ({ ms, label: String(new Date(ms).getUTCFullYear()) }))
+  }
+  const ticks: AxisTick[] = []
+  for (const tk of raw_ticks) {
+    const x = dateToX(tk.ms)
+    if (!ticks.length || x - ticks[ticks.length - 1].x >= MIN_TICK_DX) ticks.push({ ms: tk.ms, x, label: tk.label })
+  }
+
+  return { domainStart, domainEnd, pieces, gaps, ticks, dateToX, xToDate }
 }
