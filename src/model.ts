@@ -30,6 +30,7 @@ export interface Leg {
   dh: boolean       // true => deadhead (rode), false => flew (operated)
   miles: number
   aircraft: string | null
+  tripId: string | null
 }
 
 export interface Stats { miles: number; airports: number; countries: number; hours: number }

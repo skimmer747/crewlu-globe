@@ -26,6 +26,7 @@ export function flightsToLegs(rows: FlightRow[], airports: AirportIndex): { legs
       dh: Boolean(r.is_dh || r.is_commercial_deadhead),
       miles: haversineNm(s, e),
       aircraft: r.aircraft_type,
+      tripId: r.trip_id,
     })
   }
   legs.sort((a, b) => a.t - b.t)

@@ -52,4 +52,12 @@ describe('flightsToLegs', () => {
     expect(stats.countries).toBe(2)
     expect(stats.miles).toBeGreaterThan(0)
   })
+  it('carries trip_id onto the leg', () => {
+    const { legs } = flightsToLegs([
+      row({ id: 'a', departure: 'SDF', arrival: 'ANC', scheduled_block_out_time: '2024-02-11', trip_id: 'T1' }),
+      row({ id: 'b', departure: 'ANC', arrival: 'PVG', scheduled_block_out_time: '2024-02-12', trip_id: null }),
+    ], idx)
+    expect(legs[0].tripId).toBe('T1')
+    expect(legs[1].tripId).toBe(null)
+  })
 })
