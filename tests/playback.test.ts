@@ -31,4 +31,12 @@ describe('buildPlaybackSchedule', () => {
   it('empty legs -> total 0', () => {
     expect(buildPlaybackSchedule([], [], { legMs: 100, dwellMs: 50 }).totalMs).toBe(0)
   })
+  it('inserts a dwell between two standalone (null-tripId) legs', () => {
+    const s = buildPlaybackSchedule([leg('x', 1, null), leg('y', 2, null)], [], { legMs: 100, dwellMs: 50 })
+    expect(s.totalMs).toBe(250) // 100 + 50 dwell + 100
+  })
+  it('inserts no dwell when all legs share a tripId', () => {
+    const s = buildPlaybackSchedule([leg('a', 1, 'T1'), leg('b', 2, 'T1')], [], { legMs: 100, dwellMs: 50 })
+    expect(s.totalMs).toBe(200)
+  })
 })

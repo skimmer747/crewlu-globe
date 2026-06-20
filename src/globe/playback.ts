@@ -1,6 +1,8 @@
 import type { Leg } from '../model'
 import type { Trip } from '../data/trips'
 
+const tripKey = (l: Leg): string => l.tripId ?? l.id
+
 export interface PlaybackSample { index: number; phase: 'draw' | 'dwell'; frac: number; done: boolean }
 export interface PlaybackSchedule {
   totalMs: number
@@ -20,7 +22,7 @@ export function buildPlaybackSchedule(
   for (let i = 0; i < legs.length; i++) {
     drawStart[i] = cursor
     cursor += legMs
-    const boundary = i < legs.length - 1 && legs[i + 1].tripId !== legs[i].tripId
+    const boundary = i < legs.length - 1 && tripKey(legs[i + 1]) !== tripKey(legs[i])
     if (boundary) cursor += dwellMs
   }
   const totalMs = legs.length ? cursor : 0
@@ -53,7 +55,7 @@ export interface Playback {
 }
 
 export interface PlaybackController {
-  legs: () => Leg[]          // window legs, chronological
+  legs: () => Leg[]          // window legs, chronological; MUST return the same-length array between play() and pause()/done()
   trips: () => Trip[]
   startIndex: () => number   // resume: count of legs already solid (playhead-derived)
   baseLegMs: number
