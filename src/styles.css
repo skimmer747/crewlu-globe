@@ -13,3 +13,14 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
   background: #2fd6ff; color: #04121e; font-weight: 700; }
 .auth-card button.link { background: none; color: #5fb8e0; font-weight: 400; text-decoration: underline; }
 .auth-err { color: #ff8a8a; font-size: 12px; min-height: 16px; }
+
+/* ── Moon layer ─────────────────────────────────────────────────────────── */
+.moon-wrap{position:relative;width:84px;height:84px;pointer-events:none;transition:opacity .25s ease}
+.moon-chip{position:absolute;top:92px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;color:#cfe6ff;letter-spacing:1.2px}
+
+/* ── Beacon layer ────────────────────────────────────────────────────────── */
+.beacon-wrap{position:relative;width:0;height:0;pointer-events:none;transition:opacity .2s ease}
+.beacon-dot{position:absolute;left:-7px;top:-7px;width:14px;height:14px;border-radius:50%;
+    background:radial-gradient(circle,#eafff3,#3bff8a 55%,#0aa24a);box-shadow:0 0 16px 4px rgba(60,255,140,.9)}
+.beacon-ring{position:absolute;left:-7px;top:-7px;width:14px;height:14px;border-radius:50%;border:2px solid #6cffae;animation:beaconPulse 1.7s ease-out infinite}
+@keyframes beaconPulse{0%{transform:scale(1);opacity:.85}100%{transform:scale(5.5);opacity:0}}
