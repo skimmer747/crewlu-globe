@@ -33,6 +33,13 @@ describe('flightsToLegs', () => {
     const { legs } = flightsToLegs([row({ id: 't', departure: 'SDF', arrival: 'ANC', flight_date: '2024-01-01', deleted_at: '2024-02-01' })], idx)
     expect(legs.length).toBe(0)
   })
+  it('drops rows with no resolvable date', () => {
+    const { legs, dropped } = flightsToLegs([
+      row({ id: 'undated', departure: 'SDF', arrival: 'ANC' }), // no flight_date, no block_out time
+    ], idx)
+    expect(legs.length).toBe(0)
+    expect(dropped).toBe(1)
+  })
   it('legsUpTo and statsFor', () => {
     const { legs } = flightsToLegs([
       row({ id: 'a', departure: 'SDF', arrival: 'ANC', flight_date: '2024-02-11' }),

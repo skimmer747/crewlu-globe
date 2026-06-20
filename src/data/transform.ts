@@ -5,7 +5,7 @@ import { haversineNm } from '../astro/geo'
 const legTime = (r: FlightRow): number => {
   const s = r.scheduled_block_out_time ?? r.flight_date
   const t = s ? Date.parse(s) : NaN
-  return Number.isFinite(t) ? t : 0
+  return Number.isFinite(t) ? t : NaN
 }
 
 export function flightsToLegs(rows: FlightRow[], airports: AirportIndex): { legs: Leg[]; dropped: number } {
@@ -16,11 +16,13 @@ export function flightsToLegs(rows: FlightRow[], airports: AirportIndex): { legs
     const dep = r.departure ? airports.lookup(r.departure) : undefined
     const arr = r.arrival ? airports.lookup(r.arrival) : undefined
     if (!dep || !arr) { dropped++; continue }
+    const t = legTime(r)
+    if (!Number.isFinite(t)) { dropped++; continue }
     const s: [number, number] = [dep.lat, dep.lng]
     const e: [number, number] = [arr.lat, arr.lng]
     legs.push({
       id: r.id, from: dep.iata, to: arr.iata, s, e,
-      t: legTime(r),
+      t,
       dh: Boolean(r.is_dh || r.is_commercial_deadhead),
       miles: haversineNm(s, e),
       aircraft: r.aircraft_type,

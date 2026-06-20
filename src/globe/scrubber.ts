@@ -8,10 +8,26 @@ export function createScrubber(legs: Leg[]): Scrubber {
   let cb: (c: number, p: number, playing: boolean) => void = () => {}
   let host!: HTMLElement
   let scrub!: HTMLInputElement
+  let barEls: HTMLElement[] = []
   let playing = false, raf = 0
 
   const valToCutoff = (v: number) => t0 + (v / 1000) * (t1 - t0)
-  const emit = (v: number, pl: boolean) => cb(valToCutoff(v), v / 10, pl)
+
+  const lightBars = (cutoff: number) => {
+    const span = t1 - t0, NB = barEls.length
+    barEls.forEach((b, i) => {
+      const bt = t0 + ((i + 0.5) / NB) * span
+      b.classList.toggle('on', bt <= cutoff)
+      b.classList.toggle('hot', bt <= cutoff && bt > cutoff - (span / NB) * 1.6)
+    })
+  }
+
+  const emit = (v: number, pl: boolean) => {
+    const cutoff = valToCutoff(v)
+    scrub.style.setProperty('--p', (v / 10) + '%')
+    lightBars(cutoff)
+    cb(cutoff, v / 10, pl)
+  }
 
   const stop = () => { playing = false; cancelAnimationFrame(raf); host.querySelector('#play')!.textContent = '▶' }
   const play = () => {
@@ -30,7 +46,7 @@ export function createScrubber(legs: Leg[]): Scrubber {
       host = h
       h.insertAdjacentHTML('beforeend', DOCK_HTML)
       scrub = h.querySelector<HTMLInputElement>('#scrub')!
-      buildHistogram(h.querySelector('#bars')!, legs, t0, t1)
+      barEls = buildHistogram(h.querySelector('#bars')!, legs, t0, t1)
       scrub.addEventListener('input', () => { stop(); emit(+scrub.value, false) })
       h.querySelector('#play')!.addEventListener('click', () => (playing ? stop() : play()))
     },
@@ -39,11 +55,12 @@ export function createScrubber(legs: Leg[]): Scrubber {
   }
 }
 
-function buildHistogram(bars: Element, legs: Leg[], t0: number, t1: number) {
+function buildHistogram(bars: Element, legs: Leg[], t0: number, t1: number): HTMLElement[] {
   const NB = 46, counts = new Array(NB).fill(0)
   for (const l of legs) counts[Math.min(NB - 1, Math.floor(((l.t - t0) / (t1 - t0)) * NB))]++
   const mx = Math.max(1, ...counts)
   bars.innerHTML = counts.map((c) => `<div class="bar" style="height:${18 + (c / mx) * 82}%"></div>`).join('')
+  return Array.from(bars.querySelectorAll<HTMLElement>('.bar'))
 }
 
 const DOCK_HTML = `
