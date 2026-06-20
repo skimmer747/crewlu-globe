@@ -40,6 +40,13 @@ describe('schedule', () => {
     expect(defaultWindow(legs, trips, 150)).toEqual({ start: 100, end: 800 })
   })
 
+  it('defaultWindow when now is before the first leg shows the full future', () => {
+    expect(defaultWindow(legs, trips, 50)).toEqual({ start: 50, end: 800 })
+  })
+  it('defaultWindow when now is past the last leg collapses to the last leg', () => {
+    expect(defaultWindow(legs, trips, 9999)).toEqual({ start: 800, end: 800 })
+  })
+
   it('legsInWindow filters inclusive', () => {
     expect(legsInWindow(legs, { start: 100, end: 200 }).map(l => l.id)).toEqual(['p1', 'p2'])
   })

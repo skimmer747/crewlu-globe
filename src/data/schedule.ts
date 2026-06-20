@@ -4,6 +4,10 @@ import type { Trip } from './trips'
 
 export interface Window { start: number; end: number }
 
+/**
+ * @param legs Chronologically sorted by `t` ascending (flightsToLegs guarantees this).
+ *             The `else break` short-circuit is only correct for sorted input.
+ */
 export function beaconHome(legs: Leg[], now: number): LatLng | null {
   if (!legs.length) return null
   let lastFlown: Leg | null = null
