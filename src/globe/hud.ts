@@ -63,7 +63,7 @@ const HUD_HTML = `
 </div>
 
 <div id="moment">
-  <div class="chip" id="momentChip" style="cursor:pointer"><div class="sv" id="mDate" style="font-size:16px">—</div><div class="sl" id="mSub">REPLAYING</div>
+  <div class="chip" id="momentChip" style="cursor:pointer"><div class="sv" id="mDate" style="font-size:16px">—</div><div class="sl" id="mSub">PAUSED</div>
     <div class="sl" style="margin-top:7px;color:#5cff9e;opacity:.9">⌖ TAP TO CENTER ON ME</div></div>
 </div>
 
