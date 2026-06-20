@@ -128,11 +128,11 @@ async function run() {
 
   dock.onPlayToggle(() => playback.toggle())
   dock.onSpeed((mult) => playback.setSpeed(mult))
-  dock.onSeek((ms) => { playback.pause(); playhead = ms; draw() })
+  dock.onSeek((ms) => { playhead = ms; playback.pause(); draw() })
   dock.onWindowChange((s, e) => {
-    playback.pause()
     win.start = s; win.end = e
     playhead = Math.min(Math.max(playhead, s), e)
+    playback.pause()
     dock.render()
     draw()
   })

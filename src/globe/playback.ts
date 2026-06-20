@@ -78,13 +78,14 @@ export function createPlayback(c: PlaybackController): Playback {
     if (!playing || !sched) return
     const e = baseElapsed + (ts - t0)
     const s = sched.sampleAt(e)
+    const curLegs = c.legs()
     if (s.index !== lastIndex) {
       lastIndex = s.index
       c.onReveal(s.index + 1)
-      const leg = c.legs()[s.index]
+      const leg = curLegs[s.index]
       if (leg) c.onFly(leg)
     }
-    const cur = c.legs()[s.index]
+    const cur = curLegs[s.index]
     if (cur) c.onPlayhead(cur.t)
     if (s.done) { playing = false; c.onPlayingChange(false); c.onDone(); return }
     raf = requestAnimationFrame(frame)
@@ -103,7 +104,7 @@ export function createPlayback(c: PlaybackController): Playback {
     cancelAnimationFrame(raf)
     raf = requestAnimationFrame(frame)
   }
-  const pause = () => { playing = false; cancelAnimationFrame(raf); c.onPlayingChange(false) }
+  const pause = () => { if (!playing) return; playing = false; cancelAnimationFrame(raf); c.onPlayingChange(false) }
 
   return {
     play, pause,
