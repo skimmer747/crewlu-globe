@@ -3,7 +3,7 @@ import type { AirportIndex } from './airports'
 import { haversineNm } from '../astro/geo'
 
 const legTime = (r: FlightRow): number => {
-  const s = r.scheduled_block_out_time ?? r.flight_date
+  const s = r.scheduled_block_out_time ?? r.scheduled_take_off_time ?? r.take_off_time
   const t = s ? Date.parse(s) : NaN
   return Number.isFinite(t) ? t : NaN
 }

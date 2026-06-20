@@ -7,8 +7,9 @@ export interface FlightRow {
   arrival: string | null
   is_dh: boolean | null
   is_commercial_deadhead: boolean | null
-  flight_date: string | null
   scheduled_block_out_time: string | null
+  scheduled_take_off_time: string | null
+  take_off_time: string | null
   duty_period_id: string | null
   trip_id: string | null
   aircraft_type: string | null

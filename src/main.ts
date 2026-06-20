@@ -103,4 +103,7 @@ async function run() {
   scrubber.start()
 }
 
-run().catch((e) => { app.innerHTML = `<div class="auth"><div class="auth-card">Something went wrong loading your globe.<br><small>${String(e)}</small></div></div>` })
+run().catch((e) => {
+  const msg = e && e.message ? e.message : typeof e === 'string' ? e : JSON.stringify(e)
+  app.innerHTML = `<div class="auth"><div class="auth-card">Something went wrong loading your globe.<br><small>${msg}</small></div></div>`
+})
