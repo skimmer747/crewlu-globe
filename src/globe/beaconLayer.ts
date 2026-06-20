@@ -21,35 +21,23 @@ export function createBeaconLayer(): BeaconLayer {
   const pos = { lat: datum.lat, lng: datum.lng }
   let globe: any = null
   let flying: { leg: Leg; t0: number; dur: number } | null = null
-  let contrailClearAt = 0
-
-  const setContrail = (dep: [number, number], head: [number, number], dh: boolean) => {
-    const N = 28, pts: [number, number][] = [], colors: string[] = []
-    const base = dh ? '255,190,120' : '170,245,255'
-    for (let i = 0; i < N; i++) {
-      const f = i / (N - 1); const p = slerp(dep, head, f); const a = Math.pow(f, 1.5)
-      pts.push(p); colors.push(`rgba(${f > 0.9 ? '255,255,255' : base},${(0.95 * a).toFixed(3)})`)
-    }
-    globe?.pathsData([{ pts, colors }])
-  }
 
   const layer: BeaconLayer = {
     datum, el, pos,
     setContrailSink(g) {
       globe = g
       g.pathPoints((d: any) => d.pts).pathPointLat((p: any) => p[0]).pathPointLng((p: any) => p[1])
-        .pathColor((d: any) => d.colors).pathStroke(2.8).pathPointAlt(0.02).pathTransitionDuration(0)
+        .pathColor((d: any) => d.colors).pathStroke(3.4).pathPointAlt(0.02).pathTransitionDuration(0)
         .pathsData([])
     },
     setAt(lat, lng) { pos.lat = lat; pos.lng = lng; datum.lat = lat; datum.lng = lng; globe?.htmlElementsData(globe.htmlElementsData()) },
     flyLeg(leg, durationMs = 820) { flying = { leg, t0: performance.now(), dur: durationMs } },
     tick() {
-      if (flying) {
-        const p = Math.min(1, (performance.now() - flying.t0) / flying.dur)
-        const at = slerp(flying.leg.s, flying.leg.e, p)
-        this.setAt(at[0], at[1]); setContrail(flying.leg.s, at, flying.leg.dh)
-        if (p >= 1) { this.setAt(flying.leg.e[0], flying.leg.e[1]); contrailClearAt = performance.now() + 700; flying = null }
-      } else if (contrailClearAt && performance.now() > contrailClearAt) { globe?.pathsData([]); contrailClearAt = 0 }
+      if (!flying) return
+      const p = Math.min(1, (performance.now() - flying.t0) / flying.dur)
+      const at = slerp(flying.leg.s, flying.leg.e, p)
+      this.setAt(at[0], at[1])
+      if (p >= 1) { this.setAt(flying.leg.e[0], flying.leg.e[1]); flying = null }
     },
     refreshOcclusion(cam) { el.style.opacity = isOccluded(cam, datum.lat, datum.lng, datum.alt) ? '0' : '1' },
   }

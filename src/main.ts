@@ -89,16 +89,19 @@ async function run() {
     return t ? `trip to ${t.dest}` : null
   }
 
-  // Arc rebuilds are gated on the solid-count changing (the only moment the
-  // solid/ghost partition can change). The cheap per-frame updates always run.
+  // Arc rebuilds are gated on the solid-count OR the active (in-flight) leg changing.
+  // The cheap per-frame updates always run.
+  let activeLegId: string | null = null
   let lastSolidCount = -1
+  let lastActiveId: string | null = null
   const draw = (full = true) => {
     const inWin = legsInWindow(legs, { start: win.start, end: win.end })
     const { solid, ghost } = splitAtPlayhead(inWin, playhead)
-    if (full || solid.length !== lastSolidCount) {
-      setArcs(scene.globe, solid, ghost)
+    if (full || solid.length !== lastSolidCount || activeLegId !== lastActiveId) {
+      setArcs(scene.globe, solid, ghost, activeLegId)
       hud.setStats(statsFor(solid, meta))
       lastSolidCount = solid.length
+      lastActiveId = activeLegId
     }
     scene.setSun(new Date(playhead))
     moon.update(new Date(playhead))
@@ -124,13 +127,14 @@ async function run() {
     onReveal: () => { /* arcs are rebuilt by draw() when solid-count changes */ },
     onFly: (leg) => {
       const dur = Math.max(200, 1200 / SPEEDS[dock.state.speedIndex])
+      activeLegId = leg.id // paint this leg's arc green while it flies
       beacon.flyLeg(leg, dur)
       // camera follows the plane to its arrival, zoomed to the leg's length
       scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, dur)
     },
     onPlayhead: (ms) => { playhead = ms; dock.setPlayhead(ms); draw(false) },
-    onDone: () => { dock.setPlaying(false); draw() },
-    onPlayingChange: (p) => { dock.setPlaying(p); if (p) scene.globe.controls().autoRotate = false; draw() },
+    onDone: () => { activeLegId = null; dock.setPlaying(false); draw() },
+    onPlayingChange: (p) => { dock.setPlaying(p); if (p) scene.globe.controls().autoRotate = false; else activeLegId = null; draw() },
   })
 
   dock.onPlayToggle(() => playback.toggle())
