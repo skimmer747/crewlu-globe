@@ -3,7 +3,7 @@ import type { Stats } from '../model'
 export interface Hud {
   root: HTMLElement
   setStats(s: Stats): void
-  setMoment(dateLabel: string, pct: number): void
+  setMoment(dateLabel: string, tripLabel: string | null, state: 'PLAYING' | 'PAUSED'): void
   onCenterTap(cb: () => void): void
   starfield: HTMLElement
 }
@@ -32,7 +32,10 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
       q('#sCountries').textContent = String(s.countries)
       q('#sHours').textContent = s.hours.toLocaleString()
     },
-    setMoment(label, pct) { q('#mDate').textContent = label; q('#mSub').textContent = `REPLAYING · ${Math.round(pct)}%` },
+    setMoment(dateLabel, tripLabel, state) {
+      q('#mDate').textContent = tripLabel ? `${dateLabel} · ${tripLabel}` : dateLabel
+      q('#mSub').textContent = state
+    },
     onCenterTap(cb) { moment.addEventListener('click', cb) },
   }
 }
