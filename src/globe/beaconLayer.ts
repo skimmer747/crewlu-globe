@@ -7,7 +7,7 @@ export interface BeaconLayer {
   el: HTMLElement
   pos: { lat: number; lng: number }
   setAt(lat: number, lng: number): void
-  flyLeg(leg: Leg): void
+  flyLeg(leg: Leg, durationMs?: number): void
   tick(): void
   refreshOcclusion(cam: { x: number; y: number; z: number }): void
   setContrailSink(globe: any): void
@@ -42,7 +42,7 @@ export function createBeaconLayer(): BeaconLayer {
         .pathsData([])
     },
     setAt(lat, lng) { pos.lat = lat; pos.lng = lng; datum.lat = lat; datum.lng = lng; globe?.htmlElementsData(globe.htmlElementsData()) },
-    flyLeg(leg) { flying = { leg, t0: performance.now(), dur: 820 } },
+    flyLeg(leg, durationMs = 820) { flying = { leg, t0: performance.now(), dur: durationMs } },
     tick() {
       if (flying) {
         const p = Math.min(1, (performance.now() - flying.t0) / flying.dur)
