@@ -79,10 +79,12 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
 
   const bindDrag = () => {
     let dragging: 'L' | 'R' | 'P' | null = null
+    let snapshot: { windowStart: number; windowEnd: number; playhead: number } | null = null
     const down = (e: PointerEvent) => {
       const t = e.target as HTMLElement
       if (t.classList.contains('handle')) dragging = t.dataset.h as 'L' | 'R'
       else dragging = 'P'
+      snapshot = { windowStart: state.windowStart, windowEnd: state.windowEnd, playhead: state.playhead }
       track.setPointerCapture(e.pointerId)
       move(e)
     }
@@ -94,16 +96,26 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
       else { state.playhead = Math.min(Math.max(ms, state.windowStart), state.windowEnd) }
       renderTrack()
     }
-    const up = () => {
+    const commit = () => {
       if (!dragging) return
       if (dragging === 'P') cbSeek(state.playhead)
       else cbWindow(state.windowStart, state.windowEnd)
-      dragging = null
+      dragging = null; snapshot = null
+    }
+    const cancel = () => {
+      if (!dragging) return
+      if (snapshot) {
+        state.windowStart = snapshot.windowStart
+        state.windowEnd = snapshot.windowEnd
+        state.playhead = snapshot.playhead
+        renderTrack()
+      }
+      dragging = null; snapshot = null
     }
     track.addEventListener('pointerdown', down)
     track.addEventListener('pointermove', move)
-    track.addEventListener('pointerup', up)
-    track.addEventListener('pointercancel', up)
+    track.addEventListener('pointerup', commit)
+    track.addEventListener('pointercancel', cancel)
   }
 
   return {
@@ -127,8 +139,8 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
       renderTrack()
     },
     render() { axis = buildAxis(state.domainStart, state.domainEnd, state.trips); renderTrack() },
-    setPlayhead(ms) { state.playhead = ms; renderTrack() },
-    setPlaying(playing) { host.querySelector('#tlPlay')!.textContent = playing ? '❚❚' : '▶' },
+    setPlayhead(ms) { state.playhead = ms; if (host) renderTrack() },
+    setPlaying(playing) { if (host) host.querySelector('#tlPlay')!.textContent = playing ? '❚❚' : '▶' },
     setMomentTrip() { /* moment chip is owned by the HUD; dock exposes window/playhead only */ },
     onWindowChange(cb) { cbWindow = cb },
     onSeek(cb) { cbSeek = cb },
