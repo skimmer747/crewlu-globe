@@ -3,7 +3,7 @@ import type { Stats } from '../model'
 export interface Hud {
   root: HTMLElement
   setStats(s: Stats): void
-  setMoment(dateLabel: string, tripLabel: string | null, state: 'PLAYING' | 'PAUSED'): void
+  setMoment(location: string, dateTime: string): void
   onCenterTap(cb: () => void): void
   starfield: HTMLElement
 }
@@ -32,9 +32,9 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
       q('#sCountries').textContent = String(s.countries)
       q('#sHours').textContent = s.hours.toLocaleString()
     },
-    setMoment(dateLabel, tripLabel, state) {
-      q('#mDate').textContent = tripLabel ? `${dateLabel} · ${tripLabel}` : dateLabel
-      q('#mSub').textContent = state
+    setMoment(location, dateTime) {
+      q('#mDate').textContent = location
+      q('#mSub').textContent = dateTime
     },
     onCenterTap(cb) { moment.addEventListener('click', cb) },
   }
@@ -63,7 +63,7 @@ const HUD_HTML = `
 </div>
 
 <div id="moment">
-  <div class="chip" id="momentChip" style="cursor:pointer"><div class="sv" id="mDate" style="font-size:16px">—</div><div class="sl" id="mSub">PAUSED</div>
+  <div class="chip" id="momentChip" style="cursor:pointer"><div class="sv" id="mDate" style="font-size:16px">—</div><div class="sl" id="mSub">—</div>
     <div class="sl" style="margin-top:7px;color:#5cff9e;opacity:.9">⌖ TAP TO CENTER ON ME</div></div>
 </div>
 
