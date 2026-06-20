@@ -48,13 +48,16 @@ function yearStarts(start: number, end: number): number[] {
 }
 function weekStarts(start: number, end: number): number[] {
   const out: number[] = []
-  for (let ms = Math.ceil(start / (7 * DAY)) * (7 * DAY); ms <= end; ms += 7 * DAY) out.push(ms)
+  const d = new Date(start)
+  const midnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  const dow = new Date(midnight).getUTCDay() // 0 = Sunday
+  for (let ms = midnight + ((7 - dow) % 7) * DAY; ms <= end; ms += 7 * DAY) out.push(ms)
   return out
 }
 
 export function gapLabel(ms: number): string {
   const days = ms / DAY
-  if (days < 14) return `${Math.max(1, Math.round(days))}d off`
+  if (days <= 13) return `${Math.max(1, Math.round(days))}d off`
   if (days < 60) return `${Math.round(days / 7)} wks off`
   return `${Math.round(days / 30)} mo off`
 }
@@ -74,9 +77,11 @@ export function buildAxis(domainStart: number, domainEnd: number, trips: Trip[],
   const raw: Raw[] = []
   let cursor = domainStart
   for (const t of inDomain) {
-    if (t.start > cursor) raw.push({ kind: 'gap', startMs: cursor, endMs: t.start })
-    raw.push({ kind: 'active', startMs: t.start, endMs: t.end, tripId: t.id })
-    cursor = Math.max(cursor, t.end)
+    if (t.end <= cursor) continue // fully shadowed by an earlier overlapping trip
+    const segStart = Math.max(t.start, cursor)
+    if (segStart > cursor) raw.push({ kind: 'gap', startMs: cursor, endMs: segStart })
+    raw.push({ kind: 'active', startMs: segStart, endMs: t.end, tripId: t.id })
+    cursor = t.end
   }
   if (cursor < domainEnd) raw.push({ kind: 'gap', startMs: cursor, endMs: domainEnd })
   if (!raw.length) raw.push({ kind: 'gap', startMs: domainStart, endMs: domainEnd })

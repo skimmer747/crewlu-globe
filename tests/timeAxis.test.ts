@@ -57,6 +57,16 @@ describe('buildAxis dateToX / xToDate', () => {
     const activeX = axis.pieces[0].x1 - axis.pieces[0].x0
     expect(gapX).toBeLessThanOrEqual(activeX + 1e-9)
   })
+  it('keeps pieces non-overlapping in time when trips overlap', () => {
+    const t0 = Date.UTC(2026, 0, 1)
+    const overlapping = [trip('A', t0, t0 + 10 * DAY), trip('B', t0 + 5 * DAY, t0 + 15 * DAY)]
+    const ax = buildAxis(t0, t0 + 15 * DAY, overlapping)
+    for (let i = 1; i < ax.pieces.length; i++) {
+      expect(ax.pieces[i].startMs).toBeGreaterThanOrEqual(ax.pieces[i - 1].endMs)
+    }
+    const x = 0.7
+    expect(ax.dateToX(ax.xToDate(x))).toBeCloseTo(x, 6)
+  })
 })
 
 describe('buildAxis ticks', () => {
@@ -69,5 +79,24 @@ describe('buildAxis ticks', () => {
   it('uses yearly ticks across many years', () => {
     const axis = buildAxis(Date.UTC(2019, 0, 1), Date.UTC(2026, 0, 1), [trip('A', Date.UTC(2019, 0, 1), Date.UTC(2026, 0, 1))])
     expect(axis.ticks.some(tk => /^\d{4}$/.test(tk.label))).toBe(true)
+  })
+  it('weekly ticks on a short domain are Sunday-aligned with "D MON" labels', () => {
+    const t0 = Date.UTC(2026, 0, 1)
+    const axis = buildAxis(t0, t0 + 31 * DAY, [trip('A', t0, t0 + 31 * DAY)])
+    expect(axis.ticks.length).toBeGreaterThanOrEqual(3)
+    for (const tk of axis.ticks) {
+      expect(new Date(tk.ms).getUTCDay()).toBe(0)
+      expect(tk.label).toMatch(/^\d{1,2} [A-Z]{3}$/)
+    }
+  })
+  it('monthly labels include the 2-digit year when the domain crosses a year', () => {
+    const axis = buildAxis(Date.UTC(2025, 10, 1), Date.UTC(2026, 3, 1), [trip('A', Date.UTC(2025, 10, 1), Date.UTC(2026, 3, 1))])
+    expect(axis.ticks.some(tk => /^[A-Z]{3} \d{2}$/.test(tk.label))).toBe(true)
+  })
+  it('collapses month ticks that fall inside a compressed gap', () => {
+    const t0 = Date.UTC(2026, 0, 1)
+    const trips = [trip('A', t0, t0 + 3 * DAY), trip('B', Date.UTC(2026, 10, 1), Date.UTC(2026, 10, 4))]
+    const axis = buildAxis(t0, Date.UTC(2026, 10, 4), trips)
+    expect(axis.ticks.length).toBeLessThan(11) // Jan..Nov would be 11 without de-dup
   })
 })
