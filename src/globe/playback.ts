@@ -43,3 +43,78 @@ export function buildPlaybackSchedule(
     },
   }
 }
+
+export interface Playback {
+  play(): void
+  pause(): void
+  toggle(): void
+  setSpeed(mult: number): void
+  isPlaying(): boolean
+}
+
+export interface PlaybackController {
+  legs: () => Leg[]          // window legs, chronological
+  trips: () => Trip[]
+  startIndex: () => number   // resume: count of legs already solid (playhead-derived)
+  baseLegMs: number
+  baseDwellMs: number
+  onReveal: (solidCount: number) => void
+  onFly: (leg: Leg) => void
+  onPlayhead: (ms: number) => void
+  onDone: () => void
+  onPlayingChange: (playing: boolean) => void
+}
+
+export function createPlayback(c: PlaybackController): Playback {
+  let raf = 0, playing = false, speed = 1
+  let sched: PlaybackSchedule | null = null
+  let t0 = 0, baseElapsed = 0, lastIndex = -1
+
+  const build = () => buildPlaybackSchedule(c.legs(), c.trips(), { legMs: c.baseLegMs / speed, dwellMs: c.baseDwellMs / speed })
+
+  const frame = (ts: number) => {
+    if (!playing || !sched) return
+    const e = baseElapsed + (ts - t0)
+    const s = sched.sampleAt(e)
+    if (s.index !== lastIndex) {
+      lastIndex = s.index
+      c.onReveal(s.index + 1)
+      const leg = c.legs()[s.index]
+      if (leg) c.onFly(leg)
+    }
+    const cur = c.legs()[s.index]
+    if (cur) c.onPlayhead(cur.t)
+    if (s.done) { playing = false; c.onPlayingChange(false); c.onDone(); return }
+    raf = requestAnimationFrame(frame)
+  }
+
+  const play = () => {
+    const legs = c.legs()
+    if (!legs.length) return
+    sched = build()
+    const si = Math.min(Math.max(0, c.startIndex()), legs.length - 1)
+    baseElapsed = si >= legs.length - 1 ? 0 : sched.timeAtIndex(si)  // at end -> restart from beginning
+    lastIndex = -1
+    playing = true
+    c.onPlayingChange(true)
+    t0 = performance.now()
+    cancelAnimationFrame(raf)
+    raf = requestAnimationFrame(frame)
+  }
+  const pause = () => { playing = false; cancelAnimationFrame(raf); c.onPlayingChange(false) }
+
+  return {
+    play, pause,
+    toggle() { playing ? pause() : play() },
+    setSpeed(mult) {
+      speed = mult
+      if (playing && sched) {
+        const curIdx = lastIndex < 0 ? 0 : lastIndex
+        sched = build()
+        baseElapsed = sched.timeAtIndex(curIdx)
+        t0 = performance.now()
+      }
+    },
+    isPlaying() { return playing },
+  }
+}
