@@ -3,13 +3,16 @@ import { supabase } from './supabase'
 import { requireSession } from './auth/authView'
 import { loadAirports } from './data/airports'
 import { fetchFlights } from './data/flights'
-import { flightsToLegs, legsUpTo, statsFor } from './data/transform'
+import { flightsToLegs, statsFor } from './data/transform'
+import { groupIntoTrips } from './data/trips'
+import { beaconHome, focusTrip, defaultWindow, legsInWindow, splitAtPlayhead } from './data/schedule'
 import { createGlobeScene } from './globe/globeScene'
 import { configureArcs, setArcs } from './globe/arcsLayer'
 import { createMoonLayer } from './globe/moonLayer'
 import { createBeaconLayer } from './globe/beaconLayer'
 import { createHud } from './globe/hud'
-import { createScrubber } from './globe/scrubber'
+import { createTimelineDock, SPEEDS } from './globe/timelineDock'
+import { createPlayback } from './globe/playback'
 
 const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
 const fmt = (ms: number) => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2,'0')} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
@@ -76,31 +79,66 @@ async function run() {
   // they must be torn down to avoid double-binding.
   const loop = () => { beacon.tick(); requestAnimationFrame(loop) }; requestAnimationFrame(loop)
 
-  let lastRevealed = 0
-  const scrubber = createScrubber(legs)
-  scrubber.mount(hudHost)
-  scrubber.onScrub((cutoff, pct, playing) => {
-    const shown = legsUpTo(legs, cutoff)
+  const trips = groupIntoTrips(legs)
+  const now = Date.now()
+  const win = defaultWindow(legs, trips, now)
+  let playhead = Math.min(Math.max(now, win.start), win.end)
 
-    // FIX 3: gate the arc/points rebuild on count change (perf)
-    const changed = shown.length !== lastRevealed
-    if (changed) {
-      setArcs(scene.globe, shown)
-      hud.setStats(statsFor(shown, meta))
+  const tripLabelFor = (ms: number): string | null => {
+    const t = focusTrip(trips, ms)
+    return t ? `trip to ${t.dest}` : null
+  }
+
+  // Arc rebuilds are gated on the solid-count changing (the only moment the
+  // solid/ghost partition can change). The cheap per-frame updates always run.
+  let lastSolidCount = -1
+  const draw = (full = true) => {
+    const inWin = legsInWindow(legs, { start: win.start, end: win.end })
+    const { solid, ghost } = splitAtPlayhead(inWin, playhead)
+    if (full || solid.length !== lastSolidCount) {
+      setArcs(scene.globe, solid, ghost)
+      hud.setStats(statsFor(solid, meta))
+      lastSolidCount = solid.length
     }
-
-    // These are cheap and the date changes continuously — run every frame
-    hud.setMoment(fmt(cutoff), pct)
-    scene.setSun(new Date(cutoff))
-    moon.update(new Date(cutoff))
+    scene.setSun(new Date(playhead))
+    moon.update(new Date(playhead))
     scene.globe.htmlElementsData([moon.datum, beacon.datum])
     moon.refreshOcclusion(scene.cameraPos()); beacon.refreshOcclusion(scene.cameraPos())
+    hud.setMoment(fmt(playhead), tripLabelFor(playhead), playback.isPlaying() ? 'PLAYING' : 'PAUSED')
+  }
 
-    if (shown.length > lastRevealed) { const leg = shown[shown.length - 1]; playing ? beacon.flyLeg(leg) : beacon.setAt(leg.e[0], leg.e[1]) }
-    else if (shown.length < lastRevealed) { const leg = shown[shown.length - 1]; if (leg) beacon.setAt(leg.e[0], leg.e[1]) }
-    lastRevealed = shown.length
+  // Park the beacon where the pilot physically is right now.
+  const home = beaconHome(legs, now)
+  if (home) beacon.setAt(home[0], home[1])
+
+  const dock = createTimelineDock({ legs, trips, windowStart: win.start, windowEnd: win.end, playhead })
+
+  const playback = createPlayback({
+    legs: () => legsInWindow(legs, { start: win.start, end: win.end }),
+    trips: () => trips,
+    startIndex: () => splitAtPlayhead(legsInWindow(legs, { start: win.start, end: win.end }), playhead).solid.length,
+    baseLegMs: 1200,
+    baseDwellMs: 500,
+    onReveal: () => { /* arcs are rebuilt by draw() when solid-count changes */ },
+    onFly: (leg) => beacon.flyLeg(leg, Math.max(200, 1200 / SPEEDS[dock.state.speedIndex])),
+    onPlayhead: (ms) => { playhead = ms; dock.setPlayhead(ms); draw(false) },
+    onDone: () => { dock.setPlaying(false); draw() },
+    onPlayingChange: (p) => { dock.setPlaying(p); draw() },
   })
-  scrubber.start()
+
+  dock.onPlayToggle(() => playback.toggle())
+  dock.onSpeed((mult) => playback.setSpeed(mult))
+  dock.onSeek((ms) => { playback.pause(); playhead = ms; draw() })
+  dock.onWindowChange((s, e) => {
+    playback.pause()
+    win.start = s; win.end = e
+    playhead = Math.min(Math.max(playhead, s), e)
+    dock.render()
+    draw()
+  })
+
+  dock.mount(hudHost)
+  draw() // initial paint, paused
 }
 
 run().catch((e) => {
