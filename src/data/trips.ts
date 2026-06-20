@@ -10,9 +10,8 @@ export interface Trip {
 
 export function groupIntoTrips(legs: Leg[]): Trip[] {
   const groups = new Map<string, Leg[]>()
-  let standalone = 0
   for (const l of legs) {
-    const key = l.tripId ?? `__solo_${standalone++}`
+    const key = l.tripId ?? l.id
     const arr = groups.get(key)
     if (arr) arr.push(l)
     else groups.set(key, [l])
@@ -21,6 +20,7 @@ export function groupIntoTrips(legs: Leg[]): Trip[] {
   for (const [key, group] of groups) {
     const sorted = [...group].sort((a, b) => a.t - b.t)
     const last = sorted[sorted.length - 1]
+    // start/end are the first/last leg departure times (Leg.t); not flight/arrival time.
     trips.push({
       id: key,
       legs: sorted,
@@ -29,6 +29,6 @@ export function groupIntoTrips(legs: Leg[]): Trip[] {
       dest: last.to,
     })
   }
-  trips.sort((a, b) => a.start - b.start)
+  trips.sort((a, b) => a.start - b.start || a.id.localeCompare(b.id))
   return trips
 }

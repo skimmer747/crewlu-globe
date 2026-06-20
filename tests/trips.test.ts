@@ -29,6 +29,8 @@ describe('groupIntoTrips', () => {
     expect(trips.length).toBe(2)
     expect(trips[0].legs.map(l => l.id)).toEqual(['x1'])
     expect(trips[1].legs.map(l => l.id)).toEqual(['x2'])
+    expect(trips[0].id).toBe('x1')
+    expect(trips[1].id).toBe('x2')
   })
 
   it('returns [] for no legs', () => {
