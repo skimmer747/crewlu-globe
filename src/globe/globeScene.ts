@@ -34,7 +34,8 @@ export function createGlobeScene(host: HTMLElement, viewport: HTMLElement): Glob
 
   const ctr = globe.controls()
   ctr.autoRotate = true; ctr.autoRotateSpeed = 0.5
-  ctr.enableZoom = true; ctr.minDistance = 160; ctr.maxDistance = 600
+  ctr.enableZoom = true; ctr.minDistance = 160; ctr.maxDistance = 1800
+  globe.camera().far = 50000; globe.camera().updateProjectionMatrix() // render the distant sky bodies (Sun/planets)
   ctr.addEventListener('change', () => {
     const pov = globe.pointOfView()
     material.uniforms.globeRotation.value.set(pov.lng, pov.lat)

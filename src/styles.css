@@ -26,6 +26,12 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
 @keyframes beaconPulse{0%{transform:scale(1);opacity:.85}100%{transform:scale(5.5);opacity:0}}
 .beacon-wrap.moving .beacon-dot,.beacon-wrap.moving .beacon-ring{display:none}
 
+/* ── Sky bodies (Sun + planets) ──────────────────────────────────────────── */
+.sky-body{position:relative;pointer-events:none}
+.sky-sun{width:60px;height:60px;border-radius:50%;background:radial-gradient(circle,#fff7e0 0%,#ffe7a0 32%,#ffb43c 58%,rgba(255,150,40,0) 78%);box-shadow:0 0 46px 12px rgba(255,180,70,.55)}
+.sky-planet{border-radius:50%}
+.sky-label{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:5px;font-size:9px;letter-spacing:1.5px;color:#cfe6ff;white-space:nowrap;text-shadow:0 0 4px #000,0 0 8px #000}
+
 /* ── HUD chrome ──────────────────────────────────────────────────────────── */
 #stars{position:absolute;inset:-8%;opacity:.7;transition:transform .25s ease-out;will-change:transform;background-image:
     radial-gradient(1.3px 1.3px at 8% 16%,#fff,transparent),radial-gradient(1px 1px at 18% 62%,#cfe6ff,transparent),
