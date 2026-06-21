@@ -5,6 +5,9 @@ export interface Hud {
   setStats(s: Stats): void
   setMoment(location: string, dateTime: string): void
   onCenterTap(cb: () => void): void
+  onLunarToggle(cb: () => void): void
+  setLunarActive(active: boolean): void
+  setLunarReadout(text: string): void
   starfield: HTMLElement
 }
 
@@ -37,6 +40,9 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
       q('#mSub').textContent = dateTime
     },
     onCenterTap(cb) { moment.addEventListener('click', cb) },
+    onLunarToggle(cb) { q('#lunarBtn').addEventListener('click', cb) },
+    setLunarActive(active) { q('#lunarBtn').classList.toggle('on', active); q<HTMLElement>('#lunarReadout').style.display = active ? 'block' : 'none' },
+    setLunarReadout(text) { q('#lunarReadout').textContent = text },
   }
 }
 
@@ -53,6 +59,11 @@ const HUD_HTML = `
 <div class="hud" style="top:50px;left:52px;display:flex;gap:18px;font-size:9px;letter-spacing:1px">
   <span><span style="display:inline-block;width:18px;height:2px;background:#5fe0ff;vertical-align:middle;margin-right:6px;box-shadow:0 0 6px #5fe0ff"></span>FLEW</span>
   <span><span style="display:inline-block;width:18px;height:2px;background:#ffb15f;vertical-align:middle;margin-right:6px;box-shadow:0 0 6px #ffb15f"></span>DEADHEAD</span>
+</div>
+
+<div id="lunar" class="hud" style="top:74px;left:52px;pointer-events:auto">
+  <button id="lunarBtn" class="navbtn">◓ LUNAR RETURN</button>
+  <div id="lunarReadout" class="lunartel" style="display:none"></div>
 </div>
 
 <div id="rail">

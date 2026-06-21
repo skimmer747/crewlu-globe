@@ -3,7 +3,7 @@ import { planetSubpoint, PLANET_IDS, type PlanetId } from '../astro/planets'
 
 // Altitude of the "sky sphere" (Earth radii). Must sit beyond the camera's maxDistance
 // so the camera stays inside it and looks out at the bodies in their real sky directions.
-export const SKY_ALT = 22
+export const SKY_ALT = 250 // far out so the Sun/planets read as distant sky (don't bunch near Earth when zoomed way out)
 
 export interface SkyDatum { type: 'sky'; id: string; lat: number; lng: number; alt: number }
 export interface SkyBody { id: string; datum: SkyDatum; el: HTMLElement; halfSize: number; occlude: 'clip' | 'hide' }

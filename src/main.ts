@@ -17,6 +17,7 @@ import { createBeaconLayer } from './globe/beaconLayer'
 import { createHud } from './globe/hud'
 import { createTimelineDock, SPEEDS } from './globe/timelineDock'
 import { createPlayback } from './globe/playback'
+import { createLunarTrajectory, buildTrajectoryPoints, lunarReturns, LUNAR_RETURN_NM } from './globe/lunarTrajectory'
 
 const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
 const fmt = (ms: number) => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2,'0')} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
@@ -60,6 +61,7 @@ async function run() {
   const moon = createMoonLayer()
   const beacon = createBeaconLayer()
   const sky = createSkyLayer()
+  const lunar = createLunarTrajectory(scene.globe)
 
   scene.globe
     .htmlElementsData([...sky.data, moon.datum, beacon.datum])
@@ -127,12 +129,26 @@ async function run() {
   let activeLegId: string | null = null
   let lastSolidCount = -1
   let lastActiveId: string | null = null
+  let currentMiles = 0
+  let lunarOn = false, revealRaf = 0
+  // Rebuild the lunar line + readout from the current miles & Moon position (called on toggle and on every timeline change).
+  const refreshLunar = (animate: boolean) => {
+    lunar.setPath(buildTrajectoryPoints(moon.datum.lat, moon.datum.lng, moon.datum.alt))
+    const laps = lunarReturns(currentMiles)
+    hud.setLunarReadout(`DISTANCE FLOWN  ${Math.round(currentMiles).toLocaleString()} NM\nEARTH–MOON RETURN  ${LUNAR_RETURN_NM.toLocaleString()} NM\n= ${laps.toFixed(2)} LUNAR RETURNS`)
+    const target = Math.min(1, laps)
+    cancelAnimationFrame(revealRaf)
+    if (!animate) { lunar.setReveal(target); return }
+    const t0 = performance.now()
+    const step = (ts: number) => { const f = Math.min(1, (ts - t0) / 1600); lunar.setReveal(f * target); if (f < 1) revealRaf = requestAnimationFrame(step) }
+    revealRaf = requestAnimationFrame(step)
+  }
   const draw = (full = true) => {
     const inWin = legsInWindow(legs, { start: win.start, end: win.end })
     const { solid, ghost } = splitAtPlayhead(inWin, playhead)
     if (full || solid.length !== lastSolidCount || activeLegId !== lastActiveId) {
       setArcs(scene.globe, solid, ghost, activeLegId)
-      hud.setStats(statsFor(solid, meta))
+      const stats = statsFor(solid, meta); hud.setStats(stats); currentMiles = stats.miles
       lastSolidCount = solid.length
       lastActiveId = activeLegId
     }
@@ -142,6 +158,7 @@ async function run() {
     scene.globe.htmlElementsData([...sky.data, moon.datum, beacon.datum])
     applyOcclusion()
     hud.setMoment(positionAt(playhead).label, fmtDateTime(playhead))
+    if (lunarOn) refreshLunar(false) // keep the lunar line + readout in sync with the timeline
   }
 
   // Park the beacon where the pilot physically is right now.
@@ -189,6 +206,27 @@ async function run() {
     playback.pause()
     dock.render()
     draw()
+  })
+
+  // Lunar return trajectory: a NASA-style line whose length = the miles flown, drawn Earth → around
+  // the Moon → back. Toggling it pulls the camera into a wide "mission view".
+  let savedMaxDist = 0, savedPov: any = null
+  hud.onLunarToggle(() => {
+    lunarOn = !lunarOn
+    hud.setLunarActive(lunarOn)
+    const ctr = scene.globe.controls()
+    if (lunarOn) {
+      playback.pause()
+      savedMaxDist = ctr.maxDistance; savedPov = scene.globe.pointOfView()
+      ctr.maxDistance = 9000; ctr.autoRotate = false
+      scene.globe.pointOfView({ lat: 0, lng: moon.datum.lng + 90, altitude: 62 }, 1400)
+      refreshLunar(true)
+    } else {
+      cancelAnimationFrame(revealRaf)
+      lunar.hide()
+      ctr.maxDistance = savedMaxDist || 1800
+      if (savedPov) scene.globe.pointOfView(savedPov, 1200)
+    }
   })
 
   dock.mount(hudHost)
