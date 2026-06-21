@@ -16,6 +16,7 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
 
 /* ── Moon layer ─────────────────────────────────────────────────────────── */
 .moon-wrap{position:relative;width:84px;height:84px;pointer-events:none;transition:opacity .25s ease}
+.moon-scale{width:84px;height:84px;transform-origin:center}
 .moon-chip{position:absolute;top:92px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;color:#cfe6ff;letter-spacing:1.2px}
 
 /* ── Beacon layer ────────────────────────────────────────────────────────── */

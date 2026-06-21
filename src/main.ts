@@ -74,8 +74,13 @@ async function run() {
   })
   // Occlude DOM sky bodies (Moon, Sun, planets) behind the Earth as the camera moves:
   // big bodies get the limb-clip; tiny ones (planets) just hide when behind.
+  // The Moon also scales with zoom so it tracks the Earth's apparent size (it's a near body).
+  let moonRefDist = 0
   const applyOcclusion = () => {
     const cam = scene.cameraPos()
+    const camDist = Math.hypot(cam.x, cam.y, cam.z)
+    if (!moonRefDist) moonRefDist = camDist
+    moon.setScale(Math.min(3, Math.max(0.12, moonRefDist / camDist)))
     clipBehindEarth({ el: moon.el, halfSize: 42, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
     for (const b of sky.bodies) {
       if (b.occlude === 'clip') clipBehindEarth({ el: b.el, halfSize: b.halfSize, lat: b.datum.lat, lng: b.datum.lng, alt: b.datum.alt, cam, globe: scene.globe, viewport })
