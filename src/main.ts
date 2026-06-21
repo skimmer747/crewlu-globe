@@ -7,7 +7,7 @@ import { flightsToLegs, statsFor } from './data/transform'
 import { groupIntoTrips } from './data/trips'
 import { beaconHome, defaultWindow, legsInWindow, splitAtPlayhead } from './data/schedule'
 import { slerp } from './astro/geo'
-import { isOccluded } from './globe/occlusion'
+import { isOccluded, geoToCartesian } from './globe/occlusion'
 import { clipBehindEarth } from './globe/skyOcclusion'
 import { createSkyLayer } from './globe/skyLayer'
 import { createGlobeScene } from './globe/globeScene'
@@ -74,13 +74,14 @@ async function run() {
   })
   // Occlude DOM sky bodies (Moon, Sun, planets) behind the Earth as the camera moves:
   // big bodies get the limb-clip; tiny ones (planets) just hide when behind.
-  // The Moon also scales with zoom so it tracks the Earth's apparent size (it's a near body).
-  let moonRefDist = 0
   const applyOcclusion = () => {
     const cam = scene.cameraPos()
-    const camDist = Math.hypot(cam.x, cam.y, cam.z)
-    if (!moonRefDist) moonRefDist = camDist
-    moon.setScale(Math.min(3, Math.max(0.12, moonRefDist / camDist)))
+    // Moon to physical scale: sized as a real 0.273-Earth-radius sphere at its true distance.
+    const mp = geoToCartesian(moon.datum.lat, moon.datum.lng, moon.datum.alt, 100)
+    const dMoon = Math.hypot(mp.x - cam.x, mp.y - cam.y, mp.z - cam.z) || 1
+    const fov = ((scene.globe.camera?.()?.fov) ?? 50) * Math.PI / 180
+    const moonRpx = (viewport.clientHeight / 2) * Math.tan(Math.asin(Math.min(1, 27.27 / dMoon))) / Math.tan(fov / 2)
+    moon.setScale(Math.min(5, Math.max(0.02, moonRpx / 23.8))) // 23.8px = rendered disk radius at scale 1
     clipBehindEarth({ el: moon.el, halfSize: 42, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
     for (const b of sky.bodies) {
       if (b.occlude === 'clip') clipBehindEarth({ el: b.el, halfSize: b.halfSize, lat: b.datum.lat, lng: b.datum.lng, alt: b.datum.alt, cam, globe: scene.globe, viewport })

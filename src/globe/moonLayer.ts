@@ -1,7 +1,7 @@
 import { subLunarPoint, moonPhase } from '../astro/moon'
 import { isOccluded } from './occlusion'
 
-const MOON_ALT = 1.15
+const MOON_ALT = 59.3 // real Moon distance ≈ 60.3 Earth-radii from center (alt is from the surface)
 
 export interface MoonLayer {
   datum: { type: 'moon'; lat: number; lng: number; alt: number }
