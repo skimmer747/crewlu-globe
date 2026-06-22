@@ -51,8 +51,8 @@ const HUD_HTML = `
 
 <div class="tick" style="top:16px;left:16px;border-top:1.6px solid;border-left:1.6px solid"></div>
 <div class="tick" style="top:16px;right:16px;border-top:1.6px solid;border-right:1.6px solid"></div>
-<div class="tick" style="bottom:104px;left:16px;border-bottom:1.6px solid;border-left:1.6px solid"></div>
-<div class="tick" style="bottom:104px;right:16px;border-bottom:1.6px solid;border-right:1.6px solid"></div>
+<div class="tick tick-b" style="left:16px;border-bottom:1.6px solid;border-left:1.6px solid"></div>
+<div class="tick tick-b" style="right:16px;border-bottom:1.6px solid;border-right:1.6px solid"></div>
 
 <div class="hud" style="top:24px;left:52px;font-size:14px;font-weight:700;color:#eaf7ff">CREWLU<span style="color:#2fd6ff"> ·</span> FLIGHT&nbsp;GLOBE</div>
 <div id="account" class="hud" style="top:25px;right:50px">Signed in</div>

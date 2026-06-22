@@ -204,7 +204,8 @@ async function run() {
     win.start = s; win.end = e
     playhead = Math.min(Math.max(playhead, s), e)
     playback.pause()
-    dock.render()
+    // The dock manages its own rendering (live shuttle + spring-back); re-rendering it
+    // here would fight that animation. We only update the globe to the new window.
     draw()
   })
 

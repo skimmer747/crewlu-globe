@@ -1,6 +1,7 @@
 import type { Leg } from '../model'
 import type { Trip } from '../data/trips'
 import { buildAxis, type TimeAxis } from './timeAxis'
+import { shuttleRate, clampStart, clampEnd, DAY } from './shuttle'
 
 const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const dayLabel = (ms: number) => { const d = new Date(ms); return `${d.getUTCDate()} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
@@ -21,6 +22,14 @@ export interface TimelineDock {
   onSpeed(cb: (mult: number) => void): void
 }
 
+// The window fills the central BAND of the track; the outer INSET strips are the "runway"
+// for the outward velocity pull. Bars rest at the band edges.
+const INSET = 0.15
+const BAND = 1 - 2 * INSET
+const MIN_WIN_MS = 1 * DAY
+const WIN_THROTTLE_MS = 120 // how often the (heavy) globe callback fires during a live shuttle
+const SPRING_MS = 180
+
 export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowStart: number; windowEnd: number; playhead: number }): TimelineDock {
   const legs = init.legs
   const domainStart = legs.length ? legs[0].t : init.windowStart
@@ -29,7 +38,7 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
     legs, trips: init.trips, domainStart, domainEnd,
     windowStart: init.windowStart, windowEnd: init.windowEnd, playhead: init.playhead, speedIndex: 3,
   }
-  let axis: TimeAxis = buildAxis(domainStart, domainEnd, init.trips)
+  let axis: TimeAxis = buildAxis(state.windowStart, state.windowEnd, state.trips)
   let host!: HTMLElement
   let track!: HTMLElement
   let cbWindow: (s: number, e: number) => void = () => {}
@@ -37,85 +46,179 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
   let cbToggle: () => void = () => {}
   let cbSpeed: (m: number) => void = () => {}
 
-  const pctToMs = (pct: number) => axis.xToDate(pct)
-  const msToPct = (ms: number) => axis.dateToX(ms) * 100
+  // content x (0..1, within the window) <-> track fraction (0..1, across the element)
+  const cToT = (x: number) => INSET + x * BAND
+  const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+  const homeFrac = (bar: 'L' | 'R') => (bar === 'L' ? INSET : 1 - INSET)
+
+  const rebuildAxis = () => { axis = buildAxis(state.windowStart, state.windowEnd, state.trips); clampPlayhead() }
+  const clampPlayhead = () => { state.playhead = Math.min(Math.max(state.playhead, state.windowStart), state.windowEnd) }
 
   const segColor = (p: { startMs: number; endMs: number }): string => {
-    const inWindow = p.endMs >= state.windowStart && p.startMs <= state.windowEnd
-    if (!inWindow) return 'dim'
     if (p.startMs <= state.playhead && p.endMs >= state.playhead) return 'current'
     return p.endMs <= state.playhead ? 'flown' : 'upcoming'
   }
 
-  const renderTrack = () => {
-    const segs = axis.pieces.filter((p) => p.kind === 'active').map((p) => {
-      const cls = segColor(p)
-      return `<div class="seg ${cls}" style="left:${(p.x0 * 100).toFixed(3)}%;width:${((p.x1 - p.x0) * 100).toFixed(3)}%"></div>`
+  interface RenderOpts { renderAxis?: TimeAxis; barLFrac?: number; barRFrac?: number; mask?: { from: number; to: number } }
+  const renderTrack = (o: RenderOpts = {}) => {
+    const a = o.renderAxis ?? axis
+    const barL = o.barLFrac ?? INSET
+    const barR = o.barRFrac ?? (1 - INSET)
+    const tf = (x: number) => cToT(x) * 100 // content x -> track %
+    const trackW = track.clientWidth || 320
+    const segs = a.pieces.filter((p) => p.kind === 'active').map((p) => {
+      const l = tf(p.x0), w = tf(p.x1) - tf(p.x0)
+      return `<div class="seg ${segColor(p)}" style="left:${l.toFixed(3)}%;width:${w.toFixed(3)}%"></div>`
     }).join('')
-    const gaps = axis.gaps.map((g) =>
-      `<div class="gap" style="left:${(g.x0 * 100).toFixed(3)}%;width:${((g.x1 - g.x0) * 100).toFixed(3)}%"><span class="gaplbl">${g.label}</span></div>`).join('')
-    const ticks = axis.ticks.map((t) =>
-      `<span class="atick" style="left:${(t.x * 100).toFixed(3)}%">${t.label}</span>`).join('')
-    const winL = msToPct(state.windowStart), winR = msToPct(state.windowEnd)
-    const ph = msToPct(state.playhead)
+    const gaps = a.gaps.map((g) => {
+      const wPct = tf(g.x1) - tf(g.x0)
+      // only label a gap wide enough to fit the text (avoids a jumble when zoomed out)
+      const lbl = (wPct / 100) * trackW >= 46 ? `<span class="gaplbl">${g.label}</span>` : ''
+      return `<div class="gap" style="left:${tf(g.x0).toFixed(3)}%;width:${wPct.toFixed(3)}%">${lbl}</div>`
+    }).join('')
+    // Pixel-aware de-crowding: drop ticks whose labels would collide at the current width.
+    let lastTickPx = -Infinity
+    const ticks = a.ticks.filter((t) => {
+      const px = cToT(t.x) * trackW
+      if (px - lastTickPx < 54) return false
+      lastTickPx = px
+      return true
+    }).map((t) => `<span class="atick" style="left:${tf(t.x).toFixed(3)}%">${t.label}</span>`).join('')
+    const ph = cToT(a.dateToX(state.playhead)) * 100
+    const mask = o.mask
+      ? `<div class="winmask" style="left:${(o.mask.from * 100).toFixed(3)}%;width:${((o.mask.to - o.mask.from) * 100).toFixed(3)}%"></div>`
+      : ''
     track.innerHTML =
-      `<div class="winmask" style="left:0;width:${winL.toFixed(3)}%"></div>` +
-      `<div class="winmask" style="left:${winR.toFixed(3)}%;right:0"></div>` +
-      gaps + segs +
+      mask + gaps + segs +
       `<div class="phead" style="left:${ph.toFixed(3)}%"></div>` +
-      `<div class="handle hL" data-h="L" style="left:${winL.toFixed(3)}%"></div>` +
-      `<div class="handle hR" data-h="R" style="left:${winR.toFixed(3)}%"></div>` +
+      `<div class="handle hL" data-h="L" style="left:${(barL * 100).toFixed(3)}%"></div>` +
+      `<div class="handle hR" data-h="R" style="left:${(barR * 100).toFixed(3)}%"></div>` +
       `<div class="axisticks">${ticks}</div>`
-    const fromEl = host.querySelector<HTMLElement>('#tlFrom')!
-    const toEl = host.querySelector<HTMLElement>('#tlTo')!
-    fromEl.textContent = dayLabel(state.windowStart)
-    toEl.textContent = dayLabel(state.windowEnd)
+    host.querySelector<HTMLElement>('#tlFrom')!.textContent = dayLabel(state.windowStart)
+    host.querySelector<HTMLElement>('#tlTo')!.textContent = dayLabel(state.windowEnd)
   }
 
-  const pointerPct = (clientX: number) => {
-    const r = track.getBoundingClientRect()
-    return Math.min(1, Math.max(0, (clientX - r.left) / r.width))
-  }
+  const rawFrac = (clientX: number, rect: DOMRect) => (clientX - rect.left) / rect.width
 
   const bindDrag = () => {
-    let dragging: 'L' | 'R' | 'P' | null = null
-    let snapshot: { windowStart: number; windowEnd: number; playhead: number } | null = null
-    const down = (e: PointerEvent) => {
-      const t = e.target as HTMLElement
-      if (t.classList.contains('handle')) dragging = t.dataset.h as 'L' | 'R'
-      else dragging = 'P'
-      snapshot = { windowStart: state.windowStart, windowEnd: state.windowEnd, playhead: state.playhead }
-      track.setPointerCapture(e.pointerId)
-      move(e)
-    }
-    const move = (e: PointerEvent) => {
-      if (!dragging) return
-      const ms = pctToMs(pointerPct(e.clientX))
-      if (dragging === 'L') { state.windowStart = Math.min(ms, state.windowEnd - 1); state.playhead = Math.max(state.playhead, state.windowStart) }
-      else if (dragging === 'R') { state.windowEnd = Math.max(ms, state.windowStart + 1); state.playhead = Math.min(state.playhead, state.windowEnd) }
-      else { state.playhead = Math.min(Math.max(ms, state.windowStart), state.windowEnd) }
+    let dragBar: 'L' | 'R' | 'P' | null = null
+    let activeId = -1
+    let baseAxis: TimeAxis = axis // fixed-scale reference during an inward (positional) drag
+    let running = false           // outward velocity loop active
+    let raf = 0
+    let springRaf = 0
+    let lastTs = 0
+    let lastWinFire = 0
+    let lastRawF = 0
+    let lastRect: DOMRect
+
+    const reset = () => { dragBar = null; activeId = -1; running = false; cancelAnimationFrame(raf); cancelAnimationFrame(springRaf) }
+
+    // Tap / drag the track body: scrub the playhead within the window.
+    const applyPlayhead = (rawF: number, _rect: DOMRect) => {
+      const cx = clamp01((clamp01(rawF) - INSET) / BAND)
+      state.playhead = Math.min(Math.max(axis.xToDate(cx), state.windowStart), state.windowEnd)
       renderTrack()
     }
-    const commit = () => {
-      if (!dragging) return
-      if (dragging === 'P') cbSeek(state.playhead)
-      else cbWindow(state.windowStart, state.windowEnd)
-      dragging = null; snapshot = null
-    }
-    const cancel = () => {
-      if (!dragging) return
-      if (snapshot) {
-        state.windowStart = snapshot.windowStart
-        state.windowEnd = snapshot.windowEnd
-        state.playhead = snapshot.playhead
-        renderTrack()
+
+    // Inward push: the edge jumps to the date under the finger on the FIXED base scale.
+    // The trimmed-away strip dims; the track rescales only on release.
+    const applyPositional = (rawF: number, _rect: DOMRect) => {
+      const cx = clamp01((clamp01(rawF) - INSET) / BAND)
+      const date = baseAxis.xToDate(cx)
+      const barFrac = clamp01(rawF)
+      if (dragBar === 'L') {
+        state.windowStart = clampStart(date, state.windowEnd, state.domainStart, MIN_WIN_MS)
+        clampPlayhead()
+        renderTrack({ renderAxis: baseAxis, barLFrac: barFrac, mask: { from: cToT(0), to: barFrac } })
+      } else {
+        state.windowEnd = clampEnd(date, state.windowStart, state.domainEnd, MIN_WIN_MS)
+        clampPlayhead()
+        renderTrack({ renderAxis: baseAxis, barRFrac: barFrac, mask: { from: barFrac, to: cToT(1) } })
       }
-      dragging = null; snapshot = null
     }
+
+    const startLoop = () => { if (running) return; running = true; lastTs = performance.now(); raf = requestAnimationFrame(loop) }
+
+    // Outward pull: integrate the edge outward at a speed set by how far past home the finger is.
+    const loop = (ts: number) => {
+      if (!running || dragBar === null || dragBar === 'P') return
+      const dt = Math.min(0.05, (ts - lastTs) / 1000); lastTs = ts
+      const rect = lastRect, w = rect.width, rawF = lastRawF
+      const home = homeFrac(dragBar)
+      const outward = dragBar === 'L' ? rawF < home : rawF > home
+      if (!outward) { running = false; applyPositional(rawF, rect); return } // finger crossed back inside
+      const overshootPx = Math.abs(rawF - home) * w
+      const rate = shuttleRate(overshootPx, INSET * w, state.domainEnd - state.domainStart)
+      const delta = rate * dt
+      if (dragBar === 'L') state.windowStart = clampStart(state.windowStart - delta, state.windowEnd, state.domainStart, MIN_WIN_MS)
+      else state.windowEnd = clampEnd(state.windowEnd + delta, state.windowStart, state.domainEnd, MIN_WIN_MS)
+      rebuildAxis()
+      const barFrac = clamp01(rawF)
+      renderTrack(dragBar === 'L' ? { barLFrac: barFrac } : { barRFrac: barFrac })
+      if (ts - lastWinFire > WIN_THROTTLE_MS) { lastWinFire = ts; cbWindow(state.windowStart, state.windowEnd) }
+      raf = requestAnimationFrame(loop)
+    }
+
+    const springBack = (bar: 'L' | 'R', fromFrac: number) => {
+      const home = homeFrac(bar)
+      const t0 = performance.now()
+      const step = (ts: number) => {
+        const k = Math.min(1, (ts - t0) / SPRING_MS)
+        const e = 1 - Math.pow(1 - k, 3)
+        const cur = fromFrac + (home - fromFrac) * e
+        renderTrack(bar === 'L' ? { barLFrac: cur } : { barRFrac: cur })
+        if (k < 1) springRaf = requestAnimationFrame(step); else renderTrack()
+      }
+      springRaf = requestAnimationFrame(step)
+    }
+
+    const down = (e: PointerEvent) => {
+      if (dragBar) return // ignore a second finger mid-gesture
+      cancelAnimationFrame(raf); cancelAnimationFrame(springRaf); running = false // clean slate for a new gesture
+      const rect = track.getBoundingClientRect()
+      lastRect = rect
+      const f = rawFrac(e.clientX, rect)
+      lastRawF = f
+      const tol = (e.pointerType === 'touch' ? 28 : 12) / rect.width
+      const dL = Math.abs(f - INSET), dR = Math.abs(f - (1 - INSET))
+      track.setPointerCapture(e.pointerId)
+      activeId = e.pointerId
+      if (Math.min(dL, dR) > tol) { dragBar = 'P'; applyPlayhead(f, rect); return }
+      dragBar = dL <= dR ? 'L' : 'R'
+      baseAxis = axis
+      // a plain tap on a bar (no move) just springs back; an actual drag does the work
+    }
+
+    const move = (e: PointerEvent) => {
+      if (!dragBar || e.pointerId !== activeId) return
+      const rect = track.getBoundingClientRect()
+      lastRect = rect
+      const f = rawFrac(e.clientX, rect)
+      lastRawF = f
+      if (dragBar === 'P') { applyPlayhead(f, rect); return }
+      const home = homeFrac(dragBar)
+      const outward = dragBar === 'L' ? f < home : f > home
+      if (outward) startLoop()
+      else { running = false; applyPositional(f, rect) }
+    }
+
+    const up = (e: PointerEvent) => {
+      if (!dragBar || e.pointerId !== activeId) return
+      running = false; cancelAnimationFrame(raf)
+      if (dragBar === 'P') { cbSeek(state.playhead); reset(); return }
+      const bar = dragBar
+      rebuildAxis() // settle: positional drags were rendered on the fixed base scale
+      const releaseFrac = clamp01(lastRawF)
+      reset()
+      cbWindow(state.windowStart, state.windowEnd) // globe -> final window
+      springBack(bar, releaseFrac)                 // visual snap-home
+    }
+
     track.addEventListener('pointerdown', down)
     track.addEventListener('pointermove', move)
-    track.addEventListener('pointerup', commit)
-    track.addEventListener('pointercancel', cancel)
+    track.addEventListener('pointerup', up)
+    track.addEventListener('pointercancel', up)
   }
 
   return {
@@ -138,8 +241,8 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
       bindDrag()
       renderTrack()
     },
-    render() { axis = buildAxis(state.domainStart, state.domainEnd, state.trips); renderTrack() },
-    setPlayhead(ms) { state.playhead = ms; if (host) renderTrack() },
+    render() { rebuildAxis(); renderTrack() },
+    setPlayhead(ms) { state.playhead = Math.min(Math.max(ms, state.windowStart), state.windowEnd); if (host) renderTrack() },
     setPlaying(playing) { if (host) host.querySelector('#tlPlay')!.textContent = playing ? '❚❚' : '▶' },
     setMomentTrip() { /* moment chip is owned by the HUD; dock exposes window/playhead only */ },
     onWindowChange(cb) { cbWindow = cb },
