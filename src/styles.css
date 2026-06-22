@@ -101,8 +101,9 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
 }
 
 @media (max-width: 640px) {
-  #rail { right: 12px; gap: 6px; transform: translateY(-50%) scale(.82); }
-  #moment { left: 12px; transform: translateY(-50%) scale(.85); }
+  /* tuck the stat rail + moment chip into the bottom corners, just inside the frame ticks */
+  #rail { top: auto; bottom: 204px; right: 16px; gap: 6px; transform: scale(.82); transform-origin: bottom right; }
+  #moment { top: auto; bottom: 204px; left: 16px; transform: scale(.85); transform-origin: bottom left; }
   .auth-card { width: 88vw; }
   .moon-wrap { transform: scale(.8); }
   #tip { display: none; }
