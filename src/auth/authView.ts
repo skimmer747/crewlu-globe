@@ -17,7 +17,6 @@ function renderSignIn(root: HTMLElement, done: () => void) {
         <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
         <button id="signin">Sign in</button>
         <div id="err" class="auth-err"></div>
-        <p class="auth-sub" style="margin-top:2px;opacity:.75">Forgot your password? Reset it in the Crewlu app.</p>
       </div>
     </div>`
   const $ = (id: string) => root.querySelector<HTMLInputElement>('#' + id)!
