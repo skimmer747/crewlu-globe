@@ -9,6 +9,7 @@ export interface FlightRow {
   is_commercial_deadhead: boolean | null
   scheduled_block_out_time: string | null
   scheduled_take_off_time: string | null
+  scheduled_landing_time: string | null
   take_off_time: string | null
   duty_period_id: string | null
   trip_id: string | null
@@ -26,7 +27,9 @@ export interface Leg {
   to: string
   s: LatLng         // departure [lat,lng]
   e: LatLng         // arrival [lat,lng]
-  t: number         // epoch ms used for chronological ordering/replay
+  t: number         // epoch ms used for chronological ordering/replay (block-out / departure)
+  takeoff: number   // epoch ms, scheduled takeoff — start of the airborne span
+  landing: number   // epoch ms, scheduled landing — end of the airborne span (distance-estimated when data is missing/bad)
   dh: boolean       // true => deadhead (rode), false => flew (operated)
   miles: number
   aircraft: string | null

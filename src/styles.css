@@ -63,9 +63,13 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
 #tlTrack{position:relative;height:46px;margin:0 4px 26px;touch-action:none;cursor:pointer}
 #tlTrack::before{content:"";position:absolute;left:0;right:0;top:30px;height:2px;background:rgba(120,170,255,.18)}
 .seg{position:absolute;top:18px;height:24px;border-radius:3px;background:#1c6fae;opacity:.5}
-.seg.flown{background:#2fd6ff;opacity:.92}
-.seg.upcoming{background:#ffb15f;opacity:.6}
-.seg.current{background:#5fe0ff;opacity:1;box-shadow:0 0 10px rgba(95,224,255,.65);top:14px;height:32px}
+/* Trip "band" = the whole trip (on-duty incl. layovers). Past trips read blue, future (not-yet-flown) trips violet. */
+.seg.past{background:#2fd6ff;opacity:.85}
+.seg.future{background:#a78bfa;opacity:.85}
+/* Flight bars = the individual airborne legs, a slightly darker shade laid over the band. */
+.seg.air{border-radius:2px}
+.seg.air.past{background:#1f9cc4;opacity:.98}
+.seg.air.future{background:#7a5fe0;opacity:.98}
 .seg.dim{background:#39506a;opacity:.35}
 .gap{position:absolute;top:22px;height:18px;border-left:1.5px dashed rgba(150,170,190,.55);border-right:1.5px dashed rgba(150,170,190,.55)}
 .gaplbl{position:absolute;top:-16px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;color:#9fb6cc;letter-spacing:.4px}

@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { FlightRow } from '../model'
 
 const COLS =
-  'id,departure,arrival,is_dh,is_commercial_deadhead,scheduled_block_out_time,scheduled_take_off_time,take_off_time,duty_period_id,trip_id,aircraft_type,tail_number,deleted_at'
+  'id,departure,arrival,is_dh,is_commercial_deadhead,scheduled_block_out_time,scheduled_take_off_time,scheduled_landing_time,take_off_time,duty_period_id,trip_id,aircraft_type,tail_number,deleted_at'
 
 export async function fetchFlights(client: SupabaseClient): Promise<FlightRow[]> {
   const all: FlightRow[] = []

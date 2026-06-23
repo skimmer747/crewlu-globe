@@ -10,7 +10,7 @@ const idx = buildAirportIndex([
 ])
 const row = (o: Partial<FlightRow>): FlightRow => ({
   id: 'x', departure: null, arrival: null, is_dh: null, is_commercial_deadhead: null,
-  scheduled_block_out_time: null, scheduled_take_off_time: null, take_off_time: null, duty_period_id: null, trip_id: null,
+  scheduled_block_out_time: null, scheduled_take_off_time: null, scheduled_landing_time: null, take_off_time: null, duty_period_id: null, trip_id: null,
   aircraft_type: null, tail_number: null, deleted_at: null, ...o,
 })
 
@@ -59,5 +59,23 @@ describe('flightsToLegs', () => {
     ], idx)
     expect(legs[0].tripId).toBe('T1')
     expect(legs[1].tripId).toBe(null)
+  })
+  it('takeoff/landing come from the schedule, with a distance-estimate fallback for bad data', () => {
+    const { legs } = flightsToLegs([
+      row({ id: 'real', departure: 'SDF', arrival: 'ANC',
+        scheduled_block_out_time: '2024-02-11T10:00:00Z',
+        scheduled_take_off_time: '2024-02-11T10:15:00Z',
+        scheduled_landing_time: '2024-02-11T15:30:00Z' }),
+      row({ id: 'bad', departure: 'SDF', arrival: 'ANC',
+        scheduled_block_out_time: '2024-02-12T10:00:00Z',
+        scheduled_take_off_time: '2024-02-12T10:15:00Z',
+        scheduled_landing_time: '2024-02-12T09:00:00Z' }), // lands before it takes off
+    ], idx)
+    const real = legs.find(l => l.id === 'real')!
+    expect(real.takeoff).toBe(Date.parse('2024-02-11T10:15:00Z'))
+    expect(real.landing).toBe(Date.parse('2024-02-11T15:30:00Z'))
+    const bad = legs.find(l => l.id === 'bad')!
+    expect(bad.takeoff).toBe(Date.parse('2024-02-12T10:15:00Z'))
+    expect(bad.landing).toBeGreaterThan(bad.takeoff) // fell back to the estimate
   })
 })

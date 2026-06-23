@@ -8,6 +8,17 @@ const legTime = (r: FlightRow): number => {
   return Number.isFinite(t) ? t : NaN
 }
 
+/**
+ * Estimated airborne time for a leg, in milliseconds. The data only carries departure
+ * times, so flight duration is approximated from great-circle distance at ~460 kt block
+ * speed (floored at 20 min). Shared by the globe's in-air/on-ground readout (positionAt)
+ * and the timeline's per-flight bars so both agree on when a leg is "in the air".
+ */
+export const estFlightMs = (miles: number): number => Math.max(20, (miles / 460) * 60) * 60000
+
+/** Sanity cap on one leg's airborne time; a scheduled span longer than this is treated as bad data. */
+const MAX_AIR_MS = 20 * 60 * 60 * 1000
+
 export function flightsToLegs(rows: FlightRow[], airports: AirportIndex): { legs: Leg[]; dropped: number } {
   const legs: Leg[] = []
   let dropped = 0
@@ -20,11 +31,21 @@ export function flightsToLegs(rows: FlightRow[], airports: AirportIndex): { legs
     if (!Number.isFinite(t)) { dropped++; continue }
     const s: [number, number] = [dep.lat, dep.lng]
     const e: [number, number] = [arr.lat, arr.lng]
+    const miles = haversineNm(s, e)
+    // Airborne span from the schedule: takeoff -> landing. Both are ~100% populated, but ~2% of
+    // rows carry garbage (landing at/before takeoff, or absurdly long), so guard and fall back to
+    // the distance estimate when the timestamps don't make sense.
+    const toRaw = r.scheduled_take_off_time ? Date.parse(r.scheduled_take_off_time) : NaN
+    const takeoff = Number.isFinite(toRaw) ? toRaw : t
+    const lnRaw = r.scheduled_landing_time ? Date.parse(r.scheduled_landing_time) : NaN
+    const landing = Number.isFinite(lnRaw) && lnRaw > takeoff && lnRaw - takeoff <= MAX_AIR_MS
+      ? lnRaw
+      : takeoff + estFlightMs(miles)
     legs.push({
       id: r.id, from: dep.iata, to: arr.iata, s, e,
-      t,
+      t, takeoff, landing,
       dh: Boolean(r.is_dh || r.is_commercial_deadhead),
-      miles: haversineNm(s, e),
+      miles,
       aircraft: r.aircraft_type,
       tripId: r.trip_id,
     })
