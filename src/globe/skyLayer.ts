@@ -3,7 +3,10 @@ import { planetSubpoint, PLANET_IDS, type PlanetId } from '../astro/planets'
 
 // Altitude of the "sky sphere" (Earth radii). Must sit beyond the camera's maxDistance
 // so the camera stays inside it and looks out at the bodies in their real sky directions.
-export const SKY_ALT = 250 // far out so the Sun/planets read as distant sky (don't bunch near Earth when zoomed way out)
+export const SKY_ALT = 250 // far out so the Sun reads as distant sky (don't bunch near Earth when zoomed way out)
+// Planets ride just over the Earth so they cross the front of the disk as it spins (distant points
+// can't — by geometry they project off to the sides). Their HUD overlays keep them visible in front.
+export const PLANET_ALT = 0.55
 
 export interface SkyDatum { type: 'sky'; id: string; lat: number; lng: number; alt: number }
 export interface SkyBody { id: string; datum: SkyDatum; el: HTMLElement; halfSize: number; occlude: 'clip' | 'hide' }
@@ -42,7 +45,7 @@ export function createSkyLayer(): SkyLayer {
     el.style.background = p.color
     el.style.boxShadow = `0 0 7px 1px ${p.color}`
     el.innerHTML = `<div class="sky-label">${p.name}</div>`
-    bodies.push({ id, datum: { type: 'sky', id, lat: 0, lng: 0, alt: SKY_ALT }, el, halfSize: p.size / 2, occlude: 'hide' })
+    bodies.push({ id, datum: { type: 'sky', id, lat: 0, lng: 0, alt: PLANET_ALT }, el, halfSize: p.size / 2, occlude: 'hide' })
   }
 
   const byId = new Map(bodies.map((b) => [b.id, b.el]))
