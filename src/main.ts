@@ -7,9 +7,9 @@ import { flightsToLegs, statsFor } from './data/transform'
 import { groupIntoTrips } from './data/trips'
 import { beaconHome, defaultWindow, legsInWindow, splitAtPlayhead } from './data/schedule'
 import { slerp } from './astro/geo'
-import { geoToCartesian } from './globe/occlusion'
+import { isOccluded, geoToCartesian } from './globe/occlusion'
 import { clipBehindEarth } from './globe/skyOcclusion'
-import { createSkyLayer, planetZoomFade } from './globe/skyLayer'
+import { createSkyLayer } from './globe/skyLayer'
 import { createGlobeScene } from './globe/globeScene'
 import { configureArcs, setArcs } from './globe/arcsLayer'
 import { createMoonLayer } from './globe/moonLayer'
@@ -64,7 +64,7 @@ async function run() {
   const lunar = createLunarTrajectory(scene.globe)
 
   scene.globe
-    .htmlElementsData([...sky.data.filter((d) => d.id === 'sun'), moon.datum, beacon.datum])
+    .htmlElementsData([...sky.data, moon.datum, beacon.datum])
     .htmlLat((d: any) => d.lat).htmlLng((d: any) => d.lng).htmlAltitude((d: any) => d.alt)
     .htmlElement((d: any) => (d.type === 'sky' ? sky.elementFor(d.id) : d.type === 'beacon' ? beacon.el : moon.el))
   beacon.setContrailSink(scene.globe)
@@ -74,14 +74,8 @@ async function run() {
     account,
     onSignOut: async () => { await supabase.auth.signOut(); location.reload() },
   })
-  // Planets render as our own HUD overlays (positioned via getScreenCoords in applyOcclusion)
-  // rather than through three-globe's html layer, which force-hides anything behind the globe.
-  // We want them to stay visible, drawn over the Earth.
-  const planets = sky.bodies.filter((b) => b.occlude === 'hide')
-  for (const p of planets) { p.el.style.position = 'absolute'; hudHost.appendChild(p.el) }
-
-  // Occlude DOM sky bodies (Moon, Sun) behind the Earth as the camera moves: big bodies get the
-  // limb-clip. Planets stay drawn over the globe (in front), positioned each frame.
+  // Occlude DOM sky bodies (Moon, Sun, planets) behind the Earth as the camera moves:
+  // big bodies get the limb-clip; tiny ones (planets) just hide when behind.
   const applyOcclusion = () => {
     const cam = scene.cameraPos()
     // Moon to physical scale: sized as a real 0.273-Earth-radius sphere at its true distance.
@@ -91,19 +85,9 @@ async function run() {
     const moonRpx = (viewport.clientHeight / 2) * Math.tan(Math.asin(Math.min(1, 27.27 / dMoon))) / Math.tan(fov / 2)
     moon.setScale(Math.min(5, Math.max(0.02, moonRpx / 23.8))) // 23.8px = rendered disk radius at scale 1
     clipBehindEarth({ el: moon.el, halfSize: 42, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
-    // Planets ride low (b.datum.alt) so they cross the front of the Earth; fade them out as the camera
-    // pulls back so they don't bunch onto the shrunken globe with colliding labels (see planetZoomFade).
-    const camDistR = Math.hypot(cam.x, cam.y, cam.z) / 100
-    const fade = planetZoomFade(camDistR)
     for (const b of sky.bodies) {
-      if (b.occlude === 'clip') { clipBehindEarth({ el: b.el, halfSize: b.halfSize, lat: b.datum.lat, lng: b.datum.lng, alt: b.datum.alt, cam, globe: scene.globe, viewport }); continue }
-      // Planets: draw them over the globe ourselves so they stay visible in front of the Earth.
-      // Hide ones behind the camera (they'd project to a mirrored on-screen spot) or faded out when far.
-      const pc = geoToCartesian(b.datum.lat, b.datum.lng, b.datum.alt, 100)
-      const inFront = (pc.x - cam.x) * -cam.x + (pc.y - cam.y) * -cam.y + (pc.z - cam.z) * -cam.z > 0
-      const sc = inFront && fade > 0 ? scene.globe.getScreenCoords(b.datum.lat, b.datum.lng, b.datum.alt) : null
-      if (sc) { b.el.style.opacity = fade.toFixed(2); b.el.style.transform = `translate(${sc.x.toFixed(1)}px, ${sc.y.toFixed(1)}px) translate(-50%, -50%)` }
-      else b.el.style.opacity = '0'
+      if (b.occlude === 'clip') clipBehindEarth({ el: b.el, halfSize: b.halfSize, lat: b.datum.lat, lng: b.datum.lng, alt: b.datum.alt, cam, globe: scene.globe, viewport })
+      else b.el.style.opacity = isOccluded(cam, b.datum.lat, b.datum.lng, b.datum.alt) ? '0' : '1'
     }
     beacon.refreshOcclusion(cam)
   }
