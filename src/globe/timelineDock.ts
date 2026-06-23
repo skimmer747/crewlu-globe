@@ -38,7 +38,7 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
   const domainEnd = legs.length ? lastLeg.landing : init.windowEnd
   const state: DockState = {
     legs, trips: init.trips, domainStart, domainEnd,
-    windowStart: init.windowStart, windowEnd: init.windowEnd, playhead: init.playhead, now: init.now, speedIndex: 3,
+    windowStart: init.windowStart, windowEnd: init.windowEnd, playhead: init.playhead, now: init.now, speedIndex: 0,
   }
   // For drawing only, stretch each trip to its last leg's estimated landing. The Trip model still
   // ends at the last departure (schedule/focus logic depends on that); this just gives the band
@@ -95,6 +95,19 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
       if (a1 <= state.windowStart || a0 >= state.windowEnd) return ''
       return seg(a.dateToX(Math.max(a0, state.windowStart)), a.dateToX(Math.min(a1, state.windowEnd)), `air ${era(l.takeoff)}`)
     }).join('')
+    // Layover airport codes: the ground stop between two flights of the same trip. Only labeled when
+    // the gap is wide enough to read without crowding the flanking flight bars.
+    const tripKey = (x: Leg) => x.tripId ?? x.id
+    const layovers = state.legs.map((l, i) => {
+      const next = state.legs[i + 1]
+      if (!next || tripKey(next) !== tripKey(l)) return '' // skip days-off gaps between trips
+      const g0 = l.landing, g1 = next.takeoff
+      if (g1 <= g0 || g1 <= state.windowStart || g0 >= state.windowEnd) return ''
+      const x0 = tf(a.dateToX(Math.max(g0, state.windowStart)))
+      const x1 = tf(a.dateToX(Math.min(g1, state.windowEnd)))
+      if (((x1 - x0) / 100) * trackW < 30) return '' // not enough room to look good
+      return `<span class="layover" style="left:${((x0 + x1) / 2).toFixed(3)}%">${l.to}</span>`
+    }).join('')
     const gaps = a.gaps.map((g) => {
       const wPct = tf(g.x1) - tf(g.x0)
       // only label a gap wide enough to fit the text (avoids a jumble when zoomed out)
@@ -114,7 +127,7 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
       ? `<div class="winmask" style="left:${(o.mask.from * 100).toFixed(3)}%;width:${((o.mask.to - o.mask.from) * 100).toFixed(3)}%"></div>`
       : ''
     track.innerHTML =
-      mask + gaps + bands + flights +
+      mask + gaps + bands + flights + layovers +
       `<div class="phead" style="left:${ph.toFixed(3)}%"></div>` +
       `<div class="handle hL" data-h="L" style="left:${(barL * 100).toFixed(3)}%"></div>` +
       `<div class="handle hR" data-h="R" style="left:${(barR * 100).toFixed(3)}%"></div>` +
@@ -262,6 +275,7 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
         speedLbl.textContent = `${SPEEDS[state.speedIndex]}×`
         cbSpeed(SPEEDS[state.speedIndex])
       })
+      cbSpeed(SPEEDS[state.speedIndex]) // sync the playback's actual speed to the default
       h.querySelector('#tlPlay')!.addEventListener('click', () => cbToggle())
       bindDrag()
       renderTrack()
@@ -283,7 +297,7 @@ const DOCK_HTML = `
     <div id="tlTrack"></div>
     <div id="tlCtl">
       <button class="btn" id="tlPlay">▶</button>
-      <div class="tlspeed"><span class="tlk">SPEED</span><input id="tlSpeed" type="range" min="0" max="7" step="1" value="3"><span id="tlSpeedVal" class="tlv">1×</span></div>
+      <div class="tlspeed"><span class="tlk">SPEED</span><input id="tlSpeed" type="range" min="0" max="7" step="1" value="0"><span id="tlSpeedVal" class="tlv">0.3×</span></div>
       <div class="tlrange"><span class="tlk">FROM</span><span id="tlFrom" class="tlpill">—</span><span class="tlk">TO</span><span id="tlTo" class="tlpill">—</span></div>
     </div>
   </div>

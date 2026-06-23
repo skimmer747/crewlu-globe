@@ -73,6 +73,7 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
 .seg.dim{background:#39506a;opacity:.35}
 .gap{position:absolute;top:22px;height:18px;border-left:1.5px dashed rgba(150,170,190,.55);border-right:1.5px dashed rgba(150,170,190,.55)}
 .gaplbl{position:absolute;top:-16px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;color:#9fb6cc;letter-spacing:.4px}
+.layover{position:absolute;top:24px;transform:translateX(-50%);white-space:nowrap;font-size:9px;letter-spacing:.5px;color:#eaf4ff;text-shadow:0 1px 2px rgba(0,8,16,.75);pointer-events:none;z-index:1}
 .winmask{position:absolute;top:10px;bottom:0;background:rgba(3,6,12,.62);pointer-events:none;z-index:2}
 .phead{position:absolute;top:6px;bottom:2px;width:2px;background:#6cffae;box-shadow:0 0 8px #6cffae;z-index:4;transform:translateX(-1px)}
 .phead::after{content:"";position:absolute;left:-3px;bottom:-3px;width:8px;height:8px;border-radius:50%;background:#6cffae}
