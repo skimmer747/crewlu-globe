@@ -7,7 +7,7 @@ import { flightsToLegs, statsFor } from './data/transform'
 import { groupIntoTrips } from './data/trips'
 import { beaconHome, defaultWindow, legsInWindow, splitAtPlayhead } from './data/schedule'
 import { slerp } from './astro/geo'
-import { isOccluded, geoToCartesian } from './globe/occlusion'
+import { geoToCartesian } from './globe/occlusion'
 import { clipBehindEarth } from './globe/skyOcclusion'
 import { createSkyLayer } from './globe/skyLayer'
 import { createGlobeScene } from './globe/globeScene'
@@ -87,7 +87,7 @@ async function run() {
     clipBehindEarth({ el: moon.el, halfSize: 42, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
     for (const b of sky.bodies) {
       if (b.occlude === 'clip') clipBehindEarth({ el: b.el, halfSize: b.halfSize, lat: b.datum.lat, lng: b.datum.lng, alt: b.datum.alt, cam, globe: scene.globe, viewport })
-      else b.el.style.opacity = isOccluded(cam, b.datum.lat, b.datum.lng, b.datum.alt) ? '0' : '1'
+      else b.el.style.opacity = '1' // planets stay visible even when behind the Earth — drawn over the globe
     }
     beacon.refreshOcclusion(cam)
   }
