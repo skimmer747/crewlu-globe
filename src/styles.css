@@ -78,6 +78,10 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
 .phead{position:absolute;top:6px;bottom:2px;width:2px;background:#6cffae;box-shadow:0 0 8px #6cffae;z-index:4;transform:translateX(-1px)}
 .phead::after{content:"";position:absolute;left:-3px;bottom:-3px;width:8px;height:8px;border-radius:50%;background:#6cffae}
 .handle{position:absolute;top:8px;bottom:-2px;width:6px;margin-left:-3px;background:#ffd98a;border-radius:3px;box-shadow:0 0 10px #ffb15f;cursor:ew-resize;z-index:5;touch-action:none}
+/* "drag me" affordance: a little triangle just outside each window edge, pointing outward */
+.handle::after{content:"";position:absolute;top:50%;transform:translateY(-50%);width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;opacity:.9;pointer-events:none;filter:drop-shadow(0 0 2px rgba(255,177,95,.7))}
+.hL::after{right:100%;margin-right:4px;border-right:5px solid #ffd98a}
+.hR::after{left:100%;margin-left:4px;border-left:5px solid #ffd98a}
 .axisticks{position:absolute;left:0;right:0;top:48px;height:12px;pointer-events:none}
 .atick{position:absolute;transform:translateX(-50%);font-size:9px;color:#5fb8e0;letter-spacing:1px;white-space:nowrap;pointer-events:none}
 #tlCtl{display:flex;align-items:center;gap:16px}
