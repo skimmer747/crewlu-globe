@@ -5,7 +5,7 @@ import { shuttleRate, clampStart, clampEnd, DAY } from './shuttle'
 
 const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const dayLabel = (ms: number) => { const d = new Date(ms); return `${d.getUTCDate()} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
-export const SPEEDS = [0.3, 0.5, 0.75, 1, 1.5, 2, 3, 4]
+export const SPEEDS = [0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3, 4]
 
 export interface DockState { legs: Leg[]; trips: Trip[]; domainStart: number; domainEnd: number; windowStart: number; windowEnd: number; playhead: number; now: number; speedIndex: number }
 
@@ -38,7 +38,7 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
   const domainEnd = legs.length ? lastLeg.landing : init.windowEnd
   const state: DockState = {
     legs, trips: init.trips, domainStart, domainEnd,
-    windowStart: init.windowStart, windowEnd: init.windowEnd, playhead: init.playhead, now: init.now, speedIndex: 0,
+    windowStart: init.windowStart, windowEnd: init.windowEnd, playhead: init.playhead, now: init.now, speedIndex: 2, // 0.3× default; indices 0–1 are the slower 0.1×/0.2× steps below it
   }
   // For drawing only, stretch each trip to its last leg's estimated landing. The Trip model still
   // ends at the last departure (schedule/focus logic depends on that); this just gives the band
@@ -297,7 +297,7 @@ const DOCK_HTML = `
     <div id="tlTrack"></div>
     <div id="tlCtl">
       <button class="btn" id="tlPlay">▶</button>
-      <div class="tlspeed"><span class="tlk">SPEED</span><input id="tlSpeed" type="range" min="0" max="7" step="1" value="0"><span id="tlSpeedVal" class="tlv">0.3×</span></div>
+      <div class="tlspeed"><span class="tlk">SPEED</span><input id="tlSpeed" type="range" min="0" max="9" step="1" value="2"><span id="tlSpeedVal" class="tlv">0.3×</span></div>
       <div class="tlrange"><span class="tlk">FROM</span><span id="tlFrom" class="tlpill">—</span><span class="tlk">TO</span><span id="tlTo" class="tlpill">—</span></div>
     </div>
   </div>
