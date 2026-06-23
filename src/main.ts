@@ -161,7 +161,10 @@ async function run() {
     sky.update(new Date(playhead))
     scene.globe.htmlElementsData([...sky.data, moon.datum, beacon.datum])
     applyOcclusion()
-    hud.setMoment(positionAt(playhead).label, fmtDateTime(playhead))
+    // During playback show the flying leg's full route; when scrubbing/paused fall back to the
+    // exact position (route in the air, city on the ground).
+    const active = activeLegId ? legs.find((l) => l.id === activeLegId) : null
+    hud.setMoment(active ? `${active.from} → ${active.to}` : positionAt(playhead).label, fmtDateTime(playhead))
     if (lunarOn) refreshLunar(false) // keep the lunar line + readout in sync with the timeline
   }
 
