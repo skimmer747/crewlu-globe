@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildPlaybackSchedule } from '../src/globe/playback'
+import { buildPlaybackSchedule, playheadForSample } from '../src/globe/playback'
 import type { Leg } from '../src/model'
 
 const leg = (id: string, t: number, tripId: string | null): Leg =>
@@ -38,5 +38,19 @@ describe('buildPlaybackSchedule', () => {
   it('inserts no dwell when all legs share a tripId', () => {
     const s = buildPlaybackSchedule([leg('a', 1, 'T1'), leg('b', 2, 'T1')], [], { legMs: 100, dwellMs: 50 })
     expect(s.totalMs).toBe(200)
+  })
+})
+
+describe('playheadForSample', () => {
+  // airborne span: takeoff 1000 -> landing 5000 (4s of real time), departure t=900
+  const L: Leg = { ...leg('a', 900, 'T1'), takeoff: 1000, landing: 5000 }
+
+  it('interpolates across the airborne span while the leg flies (draw phase)', () => {
+    expect(playheadForSample(L, { index: 0, phase: 'draw', frac: 0, done: false })).toBe(1000)
+    expect(playheadForSample(L, { index: 0, phase: 'draw', frac: 0.5, done: false })).toBe(3000)
+    expect(playheadForSample(L, { index: 0, phase: 'draw', frac: 1, done: false })).toBe(5000)
+  })
+  it('holds at landing during a dwell', () => {
+    expect(playheadForSample(L, { index: 0, phase: 'dwell', frac: 1, done: false })).toBe(5000)
   })
 })

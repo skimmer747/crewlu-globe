@@ -46,6 +46,15 @@ export function buildPlaybackSchedule(
   }
 }
 
+/**
+ * Real timestamp to surface for a leg at a given playback sample. During the draw (flight) phase the
+ * playhead is interpolated across the leg's airborne span (takeoff→landing) so the day/night
+ * terminator and sky bodies sweep in step with the flight; during a dwell it holds at landing.
+ */
+export function playheadForSample(leg: Leg, s: PlaybackSample): number {
+  return s.phase === 'draw' ? leg.takeoff + s.frac * (leg.landing - leg.takeoff) : leg.landing
+}
+
 export interface Playback {
   play(): void
   pause(): void
@@ -86,7 +95,7 @@ export function createPlayback(c: PlaybackController): Playback {
       if (leg) c.onFly(leg)
     }
     const cur = curLegs[s.index]
-    if (cur) c.onPlayhead(cur.t)
+    if (cur) c.onPlayhead(playheadForSample(cur, s))
     if (s.done) { playing = false; c.onPlayingChange(false); c.onDone(); return }
     raf = requestAnimationFrame(frame)
   }
