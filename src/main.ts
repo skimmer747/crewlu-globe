@@ -9,7 +9,7 @@ import { beaconHome, defaultWindow, legsInWindow, splitAtPlayhead } from './data
 import { slerp } from './astro/geo'
 import { geoToCartesian } from './globe/occlusion'
 import { clipBehindEarth } from './globe/skyOcclusion'
-import { createSkyLayer } from './globe/skyLayer'
+import { createSkyLayer, planetZoomFade } from './globe/skyLayer'
 import { createGlobeScene } from './globe/globeScene'
 import { configureArcs, setArcs } from './globe/arcsLayer'
 import { createMoonLayer } from './globe/moonLayer'
@@ -91,14 +91,18 @@ async function run() {
     const moonRpx = (viewport.clientHeight / 2) * Math.tan(Math.asin(Math.min(1, 27.27 / dMoon))) / Math.tan(fov / 2)
     moon.setScale(Math.min(5, Math.max(0.02, moonRpx / 23.8))) // 23.8px = rendered disk radius at scale 1
     clipBehindEarth({ el: moon.el, halfSize: 42, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
+    // Planets ride low (b.datum.alt) so they cross the front of the Earth; fade them out as the camera
+    // pulls back so they don't bunch onto the shrunken globe with colliding labels (see planetZoomFade).
+    const camDistR = Math.hypot(cam.x, cam.y, cam.z) / 100
+    const fade = planetZoomFade(camDistR)
     for (const b of sky.bodies) {
       if (b.occlude === 'clip') { clipBehindEarth({ el: b.el, halfSize: b.halfSize, lat: b.datum.lat, lng: b.datum.lng, alt: b.datum.alt, cam, globe: scene.globe, viewport }); continue }
       // Planets: draw them over the globe ourselves so they stay visible in front of the Earth.
-      // Hide ones behind the camera (they'd project to a mirrored on-screen spot).
+      // Hide ones behind the camera (they'd project to a mirrored on-screen spot) or faded out when far.
       const pc = geoToCartesian(b.datum.lat, b.datum.lng, b.datum.alt, 100)
       const inFront = (pc.x - cam.x) * -cam.x + (pc.y - cam.y) * -cam.y + (pc.z - cam.z) * -cam.z > 0
-      const sc = inFront ? scene.globe.getScreenCoords(b.datum.lat, b.datum.lng, b.datum.alt) : null
-      if (sc) { b.el.style.opacity = '1'; b.el.style.transform = `translate(${sc.x.toFixed(1)}px, ${sc.y.toFixed(1)}px) translate(-50%, -50%)` }
+      const sc = inFront && fade > 0 ? scene.globe.getScreenCoords(b.datum.lat, b.datum.lng, b.datum.alt) : null
+      if (sc) { b.el.style.opacity = fade.toFixed(2); b.el.style.transform = `translate(${sc.x.toFixed(1)}px, ${sc.y.toFixed(1)}px) translate(-50%, -50%)` }
       else b.el.style.opacity = '0'
     }
     beacon.refreshOcclusion(cam)

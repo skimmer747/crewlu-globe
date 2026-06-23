@@ -8,6 +8,13 @@ export const SKY_ALT = 250 // far out so the Sun reads as distant sky (don't bun
 // can't — by geometry they project off to the sides). Their HUD overlays keep them visible in front.
 export const PLANET_ALT = 0.55
 
+// Planets ride low (PLANET_ALT) so they cross the front of the Earth — but that means they bunch onto
+// the globe, and their labels collide, once it shrinks into the distance. So fade them with camera
+// distance (Earth radii): full up close, gone by ~7R, leaving the clean far view of just the flight globe.
+export function planetZoomFade(camDistR: number): number {
+  return Math.max(0, Math.min(1, (7 - camDistR) / 3))
+}
+
 export interface SkyDatum { type: 'sky'; id: string; lat: number; lng: number; alt: number }
 export interface SkyBody { id: string; datum: SkyDatum; el: HTMLElement; halfSize: number; occlude: 'clip' | 'hide' }
 export interface SkyLayer {
