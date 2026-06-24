@@ -89,15 +89,14 @@ async function run() {
     const physRpx = halfH * Math.tan(Math.asin(Math.min(1, 27.27 / dMoon))) / Math.tan(fov / 2)
     let moonRpx: number
     if (lunarOn) {
-      // Blend from physical scale (altitude <10, tiny moon during zoom-out animation) to
-      // Earth-proportional scale (altitude >50, true 0.273 ratio at the full lunar view).
-      // Without the blend, the Moon balloons to 3× Earth size the instant the toggle fires.
+      // Lerp from physical size (altitude ~2, just after toggle fires, no balloon) to
+      // 80% of Earth's apparent size (altitude 62, full lunar view). Moon grows ~4× while
+      // Earth shrinks ~20×, giving a visible "zoom in" effect without the initial blob.
       const dEarth = Math.hypot(cam.x, cam.y, cam.z) || 1
       const altitude = dEarth / 100 - 1
       const earthRpx = halfH * Math.tan(Math.asin(Math.min(1, 100 / dEarth))) / Math.tan(fov / 2)
-      const propRpx = 0.273 * earthRpx
-      const t = Math.max(0, Math.min(1, (altitude - 10) / 40))
-      moonRpx = physRpx + t * (propRpx - physRpx)
+      const t = Math.max(0, Math.min(1, (altitude - 2) / 60))
+      moonRpx = physRpx + t * (0.8 * earthRpx - physRpx)
     } else {
       moonRpx = physRpx
     }
