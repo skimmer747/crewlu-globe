@@ -89,18 +89,16 @@ async function run() {
     const physRpx = halfH * Math.tan(Math.asin(Math.min(1, 27.27 / dMoon))) / Math.tan(fov / 2)
     let moonRpx: number
     if (lunarOn) {
-      // Lerp from physical size (altitude ~2, just after toggle fires, no balloon) to
-      // 80% of Earth's apparent size (altitude 62, full lunar view). Moon grows ~4× while
-      // Earth shrinks ~20×, giving a visible "zoom in" effect without the initial blob.
+      // Moon scales proportionally with Earth — both zoom in/out together.
+      // Cap at scale 1.5 prevents a blob at the low altitude when the toggle first fires.
       const dEarth = Math.hypot(cam.x, cam.y, cam.z) || 1
-      const altitude = dEarth / 100 - 1
       const earthRpx = halfH * Math.tan(Math.asin(Math.min(1, 100 / dEarth))) / Math.tan(fov / 2)
-      const t = Math.max(0, Math.min(1, (altitude - 2) / 60))
-      moonRpx = physRpx + t * (0.8 * earthRpx - physRpx)
+      moonRpx = 0.8 * earthRpx
     } else {
       moonRpx = physRpx
     }
-    moon.setScale(Math.min(5, Math.max(0.02, moonRpx / 23.8))) // 23.8px = rendered disk radius at scale 1
+    const scaleMax = lunarOn ? 1.5 : 5
+    moon.setScale(Math.min(scaleMax, Math.max(0.02, moonRpx / 23.8))) // 23.8px = rendered disk radius at scale 1
     clipBehindEarth({ el: moon.el, halfSize: 42, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
     for (const b of sky.bodies) {
       if (b.occlude === 'clip') clipBehindEarth({ el: b.el, halfSize: b.halfSize, lat: b.datum.lat, lng: b.datum.lng, alt: b.datum.alt, cam, globe: scene.globe, viewport })
