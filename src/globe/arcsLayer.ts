@@ -41,12 +41,21 @@ export function configureArcs(globe: any) {
       return `<div style="font-family:monospace;color:#eaf7ff;background:rgba(8,20,34,.85);padding:6px 9px;border:1px solid rgba(47,214,255,.4);border-radius:7px;font-size:11px"><b style="color:#2fd6ff">${d.from} → ${d.to}</b> · ${d.miles.toLocaleString()} nm<br><span style="color:${hue};font-size:9px;letter-spacing:1px">${status}</span></div>`
     })
     .pointLat((d: { lat: number }) => d.lat).pointLng((d: { lng: number }) => d.lng)
-    .pointColor(() => '#fff7e0').pointAltitude(0.012).pointRadius(0.34)
+    .pointColor(() => '#fff7e0').pointAltitude(0.012).pointRadius(0.6)
 }
 
 export function setArcs(globe: any, solid: Leg[], ghost: Leg[] = [], activeId?: string | null) {
   globe.arcsData(combineArcData(solid, ghost, activeId))
-  const apts = new Map<string, { lat: number; lng: number }>()
-  for (const l of solid) { apts.set(l.from, { lat: l.s[0], lng: l.s[1] }); apts.set(l.to, { lat: l.e[0], lng: l.e[1] }) }
+  const apts = new Map<string, { lat: number; lng: number; iata: string }>()
+  for (const l of solid) {
+    apts.set(l.from, { lat: l.s[0], lng: l.s[1], iata: l.from })
+    apts.set(l.to, { lat: l.e[0], lng: l.e[1], iata: l.to })
+  }
   globe.pointsData([...apts.values()])
+}
+
+export function configurePointClick(globe: any, onSelect: (iata: string | null) => void) {
+  globe.onPointHover((d: any) => { if (d) onSelect(d.iata) })
+  globe.onPointClick((d: any) => onSelect(d?.iata ?? null))
+  globe.onGlobeClick(() => onSelect(null))
 }

@@ -1,9 +1,21 @@
 import type { Stats } from '../model'
 
+function fmtLayover(ms: number): string {
+  const m = Math.round(ms / 60000)
+  if (m < 60) return `${m}m`
+  const h = Math.floor(m / 60), rm = m % 60
+  if (h < 24) return rm ? `${h}h ${rm}m` : `${h}h`
+  const d = Math.floor(h / 24), rh = h % 24
+  return rh ? `${d}d ${rh}h` : `${d}d`
+}
+
+export interface CityStatsData { iata: string; city: string; country: string; landings: number; layoverMs: number }
+
 export interface Hud {
   root: HTMLElement
   setStats(s: Stats): void
   setMoment(location: string, dateTime: string): void
+  setCityStats(data: CityStatsData | null): void
   onCenterTap(cb: () => void): void
   onLunarToggle(cb: () => void): void
   setLunarActive(active: boolean): void
@@ -26,6 +38,9 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
     accountEl.addEventListener('click', opts.onSignOut)
   }
 
+  const cityChip = q<HTMLDivElement>('#cityChip')
+  q('#cClose').addEventListener('click', () => { cityChip.style.display = 'none' })
+
   return {
     root: host,
     starfield: q('#stars'),
@@ -38,6 +53,14 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
     setMoment(location, dateTime) {
       q('#mDate').textContent = location
       q('#mSub').textContent = dateTime
+    },
+    setCityStats(data) {
+      if (!data) { cityChip.style.display = 'none'; return }
+      q('#cIata').textContent = data.iata
+      q('#cCity').textContent = data.city + (data.country ? ' · ' + data.country : '')
+      q('#cLandings').textContent = String(data.landings)
+      q('#cLayover').textContent = fmtLayover(data.layoverMs)
+      cityChip.style.display = 'block'
     },
     onCenterTap(cb) { moment.addEventListener('click', cb) },
     onLunarToggle(cb) { q('#lunarBtn').addEventListener('click', cb) },
@@ -76,6 +99,17 @@ const HUD_HTML = `
 <div id="moment">
   <div class="chip" id="momentChip" style="cursor:pointer"><div class="sv" id="mDate" style="font-size:16px">—</div><div class="sl" id="mSub">—</div>
     <div class="sl" style="margin-top:7px;color:#5cff9e;opacity:.9">⌖ TAP TO CENTER ON ME</div></div>
+  <div class="chip" id="cityChip" style="display:none;pointer-events:auto">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <div class="sv" id="cIata" style="font-size:22px;letter-spacing:2px">—</div>
+      <div id="cClose" style="font-size:10px;color:#5fb8e0;letter-spacing:1px;cursor:pointer;padding:2px 4px">✕</div>
+    </div>
+    <div class="sl" id="cCity" style="margin-top:3px">—</div>
+    <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px">
+      <div><div class="sv" id="cLandings" style="font-size:17px">—</div><div class="sl">LANDINGS</div></div>
+      <div><div class="sv" id="cLayover" style="font-size:17px">—</div><div class="sl">LAYOVER</div></div>
+    </div>
+  </div>
 </div>
 
 <div id="tip">DRAG TO SPIN · SCROLL TO ZOOM · MOVE MOUSE FOR PARALLAX</div>

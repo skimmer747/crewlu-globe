@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 import { requireSession } from './auth/authView'
 import { loadAirports } from './data/airports'
 import { fetchFlights } from './data/flights'
-import { flightsToLegs, statsFor } from './data/transform'
+import { flightsToLegs, statsFor, computeAirportStats } from './data/transform'
 import { groupIntoTrips } from './data/trips'
 import { beaconHome, defaultWindow, legsInWindow, splitAtPlayhead } from './data/schedule'
 import { slerp } from './astro/geo'
@@ -11,7 +11,7 @@ import { isOccluded, geoToCartesian } from './globe/occlusion'
 import { clipBehindEarth } from './globe/skyOcclusion'
 import { createSkyLayer } from './globe/skyLayer'
 import { createGlobeScene } from './globe/globeScene'
-import { configureArcs, setArcs } from './globe/arcsLayer'
+import { configureArcs, setArcs, configurePointClick } from './globe/arcsLayer'
 import { createMoonLayer } from './globe/moonLayer'
 import { createBeaconLayer } from './globe/beaconLayer'
 import { createDartLayer } from './globe/dartLayer'
@@ -42,6 +42,7 @@ async function run() {
   const [airports, flights] = await Promise.all([loadAirports(), fetchFlights(supabase)])
   const { legs, dropped } = flightsToLegs(flights, airports)
   if (dropped) console.warn(`${dropped} legs dropped (unresolved airports or undated rows)`)
+  const airportStats = computeAirportStats(legs)
 
   // FIX 4: empty-account state — render friendly panel and bail before building the globe/scrubber
   if (legs.length === 0) {
@@ -57,7 +58,7 @@ async function run() {
 
   const meta = airports
 
-  const scene = createGlobeScene(host, viewport)
+  const scene = createGlobeScene(host, viewport, hudHost)
   configureArcs(scene.globe)
   const moon = createMoonLayer()
   const beacon = createBeaconLayer()
@@ -96,6 +97,14 @@ async function run() {
   }
   scene.onCameraChange(applyOcclusion)
   hud.onCenterTap(() => { scene.globe.controls().autoRotate = false; scene.globe.pointOfView({ lat: beacon.pos.lat, lng: beacon.pos.lng, altitude: 1.7 }, 950) })
+
+  configurePointClick(scene.globe, (iata) => {
+    if (!iata) { hud.setCityStats(null); return }
+    const apt = airports.lookup(iata)
+    const stats = airportStats.get(iata)
+    if (!apt || !stats) { hud.setCityStats(null); return }
+    hud.setCityStats({ iata, city: apt.city ?? iata, country: apt.country ?? '', landings: stats.landings, layoverMs: stats.layoverMs })
+  })
 
   // FIX 6: starfield parallax — drifts at a smaller depth than the globe tilt
   window.addEventListener('mousemove', (e) => {

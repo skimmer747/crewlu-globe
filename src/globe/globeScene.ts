@@ -10,7 +10,7 @@ export interface GlobeScene {
   onCameraChange(cb: () => void): void
 }
 
-export function createGlobeScene(host: HTMLElement, viewport: HTMLElement): GlobeScene {
+export function createGlobeScene(host: HTMLElement, viewport: HTMLElement, parallaxTarget?: HTMLElement): GlobeScene {
   const loader = new THREE.TextureLoader()
   const material = new THREE.ShaderMaterial({
     uniforms: {
@@ -44,7 +44,9 @@ export function createGlobeScene(host: HTMLElement, viewport: HTMLElement): Glob
   window.addEventListener('mousemove', (e) => {
     const x = e.clientX / window.innerWidth - 0.5
     const y = e.clientY / window.innerHeight - 0.5
-    viewport.style.transform = `perspective(1300px) rotateY(${x * 5}deg) rotateX(${-y * 5}deg) scale(1.01)`
+    // Apply parallax tilt to the HUD overlay only — NOT the viewport/canvas, which would
+    // break globe.gl's raycaster (getBoundingClientRect skews vs state.width/height).
+    if (parallaxTarget) parallaxTarget.style.transform = `perspective(1300px) rotateY(${x * 5}deg) rotateX(${-y * 5}deg) scale(1.01)`
   })
 
   return {

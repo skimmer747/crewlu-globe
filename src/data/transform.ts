@@ -56,6 +56,24 @@ export function flightsToLegs(rows: FlightRow[], airports: AirportIndex): { legs
 
 export const legsUpTo = (legs: Leg[], cutoffMs: number): Leg[] => legs.filter((l) => l.t <= cutoffMs)
 
+export interface AirportStats { landings: number; layoverMs: number }
+
+// legs must already be sorted by t (flightsToLegs guarantees this).
+// Layover = ground time between this landing and the next departure from the same airport.
+export function computeAirportStats(legs: Leg[]): Map<string, AirportStats> {
+  const stats = new Map<string, AirportStats>()
+  for (let i = 0; i < legs.length; i++) {
+    const leg = legs[i]
+    const s = stats.get(leg.to) ?? { landings: 0, layoverMs: 0 }
+    s.landings++
+    if (i + 1 < legs.length && legs[i + 1].from === leg.to) {
+      s.layoverMs += Math.max(0, legs[i + 1].t - leg.landing)
+    }
+    stats.set(leg.to, s)
+  }
+  return stats
+}
+
 export function statsFor(legs: Leg[], airports: AirportIndex): Stats {
   const codes = new Set<string>()
   const countries = new Set<string>()
