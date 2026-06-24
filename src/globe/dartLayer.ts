@@ -7,7 +7,13 @@ import type { Leg } from '../model'
 // Positioned/oriented per-frame against the globe via getCoords; animated from main's rAF loop.
 
 const EARTH_NM = 3440.07      // earth radius in nautical miles (great-circle angle = miles / R)
-const BASE = 1.8              // overall size in globe-radius units (globe radius = 100)
+// Size scales with the leg's length (globe radius = 100, so surface arc = 100 * angle): a
+// short hop gets a small dart, a long haul a larger one — clamped at both ends so it never
+// dwarfs a short route or balloons on a transcon.
+const SIZE_FRAC = 0.11       // dart length ≈ this fraction of the leg's surface arc...
+const MIN_SIZE = 1.3         // ...floored so short hops still show a small dart
+const MAX_SIZE = 5.0         // ...and capped so long hauls don't get huge
+const GEOM_LEN = 3.05        // nose-to-tail length of the unit geometry
 const GROW_END = 0.16         // fraction of the leg spent climbing out (scale 0 -> 1)
 const SHRINK_START = 0.84     // fraction after which it descends (scale 1 -> 0)
 const SKIM_ALT = 0.012        // altitude at the runway ends (globe-radius units)
@@ -146,7 +152,8 @@ export function createDartLayer(): DartLayer {
       object.position.copy(pos)
       object.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, forward))
       object.rotateZ(BANK * pres)   // bank into cruise (roll about the nose), level for takeoff/landing
-      object.scale.setScalar(pres * BASE)
+      const legLen = Math.min(MAX_SIZE, Math.max(MIN_SIZE, SIZE_FRAC * 100 * flying.ang)) // size by leg length
+      object.scale.setScalar(pres * legLen / GEOM_LEN)
       object.visible = true
       if (p >= 1) { flying = null; hide() }
     },
