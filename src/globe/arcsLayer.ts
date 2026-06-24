@@ -28,10 +28,10 @@ export function configureArcs(globe: any) {
     .arcStartLat((d: Leg) => d.s[0]).arcStartLng((d: Leg) => d.s[1])
     .arcEndLat((d: Leg) => d.e[0]).arcEndLng((d: Leg) => d.e[1])
     .arcColor((d: ArcLeg) => arcPaint(d))
-    .arcStroke((d: ArcLeg) => (d.__active ? 1.5 : d.__ghost ? 0.3 : 0.4))
+    .arcStroke((d: ArcLeg) => (d.__active ? 0.5 : d.__ghost ? 0.3 : 0.4))
     .arcAltitudeAutoScale(0.45)
-    .arcDashLength((d: ArcLeg) => (d.__active ? 0.45 : d.__ghost ? 0.25 : 0.45))
-    .arcDashGap((d: ArcLeg) => (d.__active ? 0.35 : d.__ghost ? 0.5 : 0.18))
+    .arcDashLength((d: ArcLeg) => (d.__active ? 1 : d.__ghost ? 0.25 : 0.45)) // active: solid & still
+    .arcDashGap((d: ArcLeg) => (d.__active ? 0 : d.__ghost ? 0.5 : 0.18))
     .arcDashAnimateTime(2600)
     .arcLabel((d: ArcLeg) => {
       const hue = d.dh ? DH : FLEW

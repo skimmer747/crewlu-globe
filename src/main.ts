@@ -14,6 +14,7 @@ import { createGlobeScene } from './globe/globeScene'
 import { configureArcs, setArcs } from './globe/arcsLayer'
 import { createMoonLayer } from './globe/moonLayer'
 import { createBeaconLayer } from './globe/beaconLayer'
+import { createDartLayer } from './globe/dartLayer'
 import { createHud } from './globe/hud'
 import { createTimelineDock, SPEEDS } from './globe/timelineDock'
 import { createPlayback } from './globe/playback'
@@ -60,6 +61,7 @@ async function run() {
   configureArcs(scene.globe)
   const moon = createMoonLayer()
   const beacon = createBeaconLayer()
+  const dart = createDartLayer()
   const sky = createSkyLayer()
   const lunar = createLunarTrajectory(scene.globe)
 
@@ -68,6 +70,7 @@ async function run() {
     .htmlLat((d: any) => d.lat).htmlLng((d: any) => d.lng).htmlAltitude((d: any) => d.alt)
     .htmlElement((d: any) => (d.type === 'sky' ? sky.elementFor(d.id) : d.type === 'beacon' ? beacon.el : moon.el))
   beacon.setContrailSink(scene.globe)
+  dart.attach(scene.globe)
 
   // FIX 5: pass real account email and sign-out handler to the HUD chip
   const hud = createHud(hudHost, {
@@ -103,7 +106,7 @@ async function run() {
   // FIX 7: these listeners and the rAF loop persist for the page lifetime.
   // The app mounts once; if a future sign-out→re-render path is added,
   // they must be torn down to avoid double-binding.
-  const loop = () => { beacon.tick(); requestAnimationFrame(loop) }; requestAnimationFrame(loop)
+  const loop = () => { beacon.tick(); dart.tick(); beacon.setVeil(dart.presence()); requestAnimationFrame(loop) }; requestAnimationFrame(loop)
 
   const trips = groupIntoTrips(legs)
   const now = Date.now()
@@ -187,12 +190,14 @@ async function run() {
       const dur = Math.max(200, 1200 / SPEEDS[dock.state.speedIndex])
       activeLegId = leg.id // paint this leg's arc green while it flies
       beacon.flyLeg(leg, dur)
+      dart.flyLeg(leg, dur) // the 3D dart rides the same leg, in sync
+
       // camera follows the plane to its arrival, zoomed to the leg's length
       scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, dur)
     },
     onPlayhead: (ms) => { playhead = ms; dock.setPlayhead(ms); draw(false) },
     onDone: () => { activeLegId = null; dock.setPlaying(false); draw() },
-    onPlayingChange: (p) => { dock.setPlaying(p); beacon.el.classList.toggle('moving', p); if (p) scene.globe.controls().autoRotate = false; else activeLegId = null; draw() },
+    onPlayingChange: (p) => { dock.setPlaying(p); if (p) scene.globe.controls().autoRotate = false; else { activeLegId = null; dart.stop(); beacon.halt() } draw() },
   })
 
   dock.onPlayToggle(() => playback.toggle())

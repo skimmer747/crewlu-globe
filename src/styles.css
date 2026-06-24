@@ -26,7 +26,6 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
     background:radial-gradient(circle,#eafff3,#3bff8a 55%,#0aa24a);box-shadow:0 0 16px 4px rgba(60,255,140,.9)}
 .beacon-ring{position:absolute;left:-7px;top:-7px;width:14px;height:14px;border-radius:50%;border:2px solid #6cffae;animation:beaconPulse 1.7s ease-out infinite}
 @keyframes beaconPulse{0%{transform:scale(1);opacity:.85}100%{transform:scale(5.5);opacity:0}}
-.beacon-wrap.moving .beacon-dot,.beacon-wrap.moving .beacon-ring{display:none}
 
 /* ── Sky bodies (Sun + planets) ──────────────────────────────────────────── */
 .sky-body{position:relative;pointer-events:none}
