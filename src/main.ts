@@ -84,19 +84,22 @@ async function run() {
     const cam = scene.cameraPos()
     const fov = ((scene.globe.camera?.()?.fov) ?? 50) * Math.PI / 180
     const halfH = viewport.clientHeight / 2
+    const mp = geoToCartesian(moon.datum.lat, moon.datum.lng, moon.datum.alt, 100)
+    const dMoon = Math.hypot(mp.x - cam.x, mp.y - cam.y, mp.z - cam.z) || 1
+    const physRpx = halfH * Math.tan(Math.asin(Math.min(1, 27.27 / dMoon))) / Math.tan(fov / 2)
     let moonRpx: number
     if (lunarOn) {
-      // Lunar return: camera is 90° from the Earth-Moon axis, so dMoon >> 60 Earth-radii.
-      // Size the Moon proportionally to Earth (true ratio 0.273) so both read correctly
-      // in the same frame — pure physical scale undersizes the Moon from this angle.
+      // Blend from physical scale (altitude <10, tiny moon during zoom-out animation) to
+      // Earth-proportional scale (altitude >50, true 0.273 ratio at the full lunar view).
+      // Without the blend, the Moon balloons to 3× Earth size the instant the toggle fires.
       const dEarth = Math.hypot(cam.x, cam.y, cam.z) || 1
+      const altitude = dEarth / 100 - 1
       const earthRpx = halfH * Math.tan(Math.asin(Math.min(1, 100 / dEarth))) / Math.tan(fov / 2)
-      moonRpx = 0.273 * earthRpx
+      const propRpx = 0.273 * earthRpx
+      const t = Math.max(0, Math.min(1, (altitude - 10) / 40))
+      moonRpx = physRpx + t * (propRpx - physRpx)
     } else {
-      // Normal view: physical scale — Moon appears as a distant object.
-      const mp = geoToCartesian(moon.datum.lat, moon.datum.lng, moon.datum.alt, 100)
-      const dMoon = Math.hypot(mp.x - cam.x, mp.y - cam.y, mp.z - cam.z) || 1
-      moonRpx = halfH * Math.tan(Math.asin(Math.min(1, 27.27 / dMoon))) / Math.tan(fov / 2)
+      moonRpx = physRpx
     }
     moon.setScale(Math.min(5, Math.max(0.02, moonRpx / 23.8))) // 23.8px = rendered disk radius at scale 1
     clipBehindEarth({ el: moon.el, halfSize: 42, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
