@@ -33,9 +33,9 @@ function envelope(p: number): number {
 function buildDart(): any {
   const N = [0, 0.18, 2.0], S = [0, 0.82, -0.95]             // nose, tall spine tail (steep roof)
   const L = [-0.95, -0.32, -1.05], R = [0.95, -0.32, -1.05], B = [0, -0.16, -0.7] // swept wingtips, belly
-  const nose = new THREE.Color('#eafff6')
-  const leftTop = new THREE.Color('#9effc8'), rightTop = new THREE.Color('#29a574') // strong fake side-lighting
-  const belly = new THREE.Color('#1c7350'), back = new THREE.Color('#2a9263')
+  const nose = new THREE.Color('#ffffff')
+  const leftTop = new THREE.Color('#ffffff'), rightTop = new THREE.Color('#a8b8c8') // fake side-lighting (lit vs shaded)
+  const belly = new THREE.Color('#5f6e7d'), back = new THREE.Color('#869aab')
   const faces: [number[], any][][] = [
     [[N, nose], [L, leftTop], [S, leftTop]],    // left top panel (lit)
     [[N, nose], [S, rightTop], [R, rightTop]],  // right top panel (shaded)
@@ -58,7 +58,7 @@ function buildDart(): any {
   // Glowing edge rim — the spine crease + outline.
   group.add(new THREE.LineSegments(
     new THREE.EdgesGeometry(geo, 18),
-    new THREE.LineBasicMaterial({ color: '#eafff4', transparent: true, opacity: 0.95 }),
+    new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.95 }),
   ))
 
   // Layered comet tail: wide soft glow + brighter narrow core, flaring at the dart and
@@ -68,7 +68,7 @@ function buildDart(): any {
     g.rotateX(-Math.PI / 2)            // base (wide) toward +Z near the dart, tip trailing (-Z)
     g.translate(0, 0, -len / 2 - 0.45)
     return new THREE.Mesh(g, new THREE.MeshBasicMaterial({
-      color: '#5cff9e', transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+      color: '#dce9ff', transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     }))
   }
   group.add(cone(0.5, 3.4, 0.12))
@@ -77,7 +77,7 @@ function buildDart(): any {
   // Afterburner core.
   const ab = new THREE.Mesh(
     new THREE.SphereGeometry(0.3, 12, 12),
-    new THREE.MeshBasicMaterial({ color: '#cdfaff', transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ color: '#eef6ff', transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }),
   )
   ab.position.set(0, 0, -0.8)
   group.add(ab)
