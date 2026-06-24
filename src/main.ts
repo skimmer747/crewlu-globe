@@ -7,7 +7,7 @@ import { flightsToLegs, statsFor, computeAirportStats } from './data/transform'
 import { groupIntoTrips } from './data/trips'
 import { beaconHome, defaultWindow, legsInWindow, splitAtPlayhead } from './data/schedule'
 import { slerp } from './astro/geo'
-import { isOccluded, geoToCartesian } from './globe/occlusion'
+import { isOccluded } from './globe/occlusion'
 import { clipBehindEarth } from './globe/skyOcclusion'
 import { createSkyLayer } from './globe/skyLayer'
 import { createGlobeScene } from './globe/globeScene'
@@ -24,7 +24,7 @@ const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DE
 const fmt = (ms: number) => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2,'0')} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
 const pad = (n: number) => String(n).padStart(2, '0')
 const fmtDateTime = (ms: number) => { const d = new Date(ms); return `${fmt(ms)} · ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}z` }
-const LUNAR_MOON_SCALE = 0.9 // fixed on-screen Moon size in lunar-return mode (camera-independent; bigger = larger disk)
+const MOON_EARTH_RATIO = 0.45 // Moon's on-screen size as a fraction of Earth's apparent size (both scale together at every zoom; bigger = larger Moon)
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
@@ -83,20 +83,15 @@ async function run() {
   // big bodies get the limb-clip; tiny ones (planets) just hide when behind.
   const applyOcclusion = () => {
     const cam = scene.cameraPos()
-    if (lunarOn) {
-      // In lunar mode the Moon holds a FIXED on-screen size — it must NOT resize as the
-      // camera zooms out to the mission view, or as the user zooms within it. A camera-
-      // independent constant keeps it put; tune LUNAR_MOON_SCALE for a bigger/smaller disk.
-      moon.setScale(LUNAR_MOON_SCALE)
-    } else {
-      // Normal view: physical apparent size — the Moon scales naturally with camera distance.
-      const fov = ((scene.globe.camera?.()?.fov) ?? 50) * Math.PI / 180
-      const halfH = viewport.clientHeight / 2
-      const mp = geoToCartesian(moon.datum.lat, moon.datum.lng, moon.datum.alt, 100)
-      const dMoon = Math.hypot(mp.x - cam.x, mp.y - cam.y, mp.z - cam.z) || 1
-      const physRpx = halfH * Math.tan(Math.asin(Math.min(1, 27.27 / dMoon))) / Math.tan(fov / 2)
-      moon.setScale(Math.min(5, Math.max(0.02, physRpx / 23.8))) // 23.8px = rendered disk radius at scale 1
-    }
+    // The Moon's on-screen size is locked to a fixed fraction of the Earth's apparent size
+    // — the SAME formula in both normal and lunar modes — so the two always scale together:
+    // zoom out and both shrink at the same ratio, zoom in and both grow. No mode-dependent
+    // jump when toggling lunar return. MOON_EARTH_RATIO is the single size knob.
+    const fov = ((scene.globe.camera?.()?.fov) ?? 50) * Math.PI / 180
+    const halfH = viewport.clientHeight / 2
+    const dEarth = Math.hypot(cam.x, cam.y, cam.z) || 1
+    const earthRpx = halfH * Math.tan(Math.asin(Math.min(1, 100 / dEarth))) / Math.tan(fov / 2)
+    moon.setScale(Math.min(2, Math.max(0.02, (MOON_EARTH_RATIO * earthRpx) / 23.8))) // 23.8px = rendered disk radius at scale 1
     clipBehindEarth({ el: moon.el, halfSize: 42, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
     for (const b of sky.bodies) {
       if (b.occlude === 'clip') clipBehindEarth({ el: b.el, halfSize: b.halfSize, lat: b.datum.lat, lng: b.datum.lng, alt: b.datum.alt, cam, globe: scene.globe, viewport })
