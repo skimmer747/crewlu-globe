@@ -91,7 +91,10 @@ async function run() {
     const halfH = viewport.clientHeight / 2
     const dEarth = Math.hypot(cam.x, cam.y, cam.z) || 1
     const earthRpx = halfH * Math.tan(Math.asin(Math.min(1, 100 / dEarth))) / Math.tan(fov / 2)
-    moon.setScale(Math.min(2, Math.max(0.02, (MOON_EARTH_RATIO * earthRpx) / 23.8))) // 23.8px = rendered disk radius at scale 1
+    // Cap of 10 is just a safety ceiling (only reached when Earth fills the whole viewport,
+    // where the Moon is off-screen anyway). A lower cap froze the Moon at a fixed size while
+    // zoomed in, so it couldn't shrink with Earth until Earth had nearly caught down to it.
+    moon.setScale(Math.min(10, Math.max(0.02, (MOON_EARTH_RATIO * earthRpx) / 23.8))) // 23.8px = rendered disk radius at scale 1
     clipBehindEarth({ el: moon.el, halfSize: 42, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
     for (const b of sky.bodies) {
       if (b.occlude === 'clip') clipBehindEarth({ el: b.el, halfSize: b.halfSize, lat: b.datum.lat, lng: b.datum.lng, alt: b.datum.alt, cam, globe: scene.globe, viewport })
