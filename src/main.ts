@@ -58,7 +58,7 @@ async function run() {
 
   const meta = airports
 
-  const scene = createGlobeScene(host, viewport, hudHost)
+  const scene = createGlobeScene(host, viewport)
   configureArcs(scene.globe)
   const moon = createMoonLayer()
   const beacon = createBeaconLayer()
