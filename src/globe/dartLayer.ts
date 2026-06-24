@@ -7,7 +7,7 @@ import type { Leg } from '../model'
 // Positioned/oriented per-frame against the globe via getCoords; animated from main's rAF loop.
 
 const EARTH_NM = 3440.07      // earth radius in nautical miles (great-circle angle = miles / R)
-const BASE = 3.6              // overall size in globe-radius units (globe radius = 100)
+const BASE = 1.8              // overall size in globe-radius units (globe radius = 100)
 const GROW_END = 0.16         // fraction of the leg spent climbing out (scale 0 -> 1)
 const SHRINK_START = 0.84     // fraction after which it descends (scale 1 -> 0)
 const SKIM_ALT = 0.012        // altitude at the runway ends (globe-radius units)
