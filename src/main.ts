@@ -24,7 +24,7 @@ const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DE
 const fmt = (ms: number) => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2,'0')} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
 const pad = (n: number) => String(n).padStart(2, '0')
 const fmtDateTime = (ms: number) => { const d = new Date(ms); return `${fmt(ms)} · ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}z` }
-const MOON_EARTH_RATIO = 0.45 // Moon's on-screen size as a fraction of Earth's apparent size (both scale together at every zoom; bigger = larger Moon)
+const MOON_EARTH_RATIO = 0.25 // Moon's on-screen size as a fraction of Earth's apparent size (both scale together at every zoom; bigger = larger Moon)
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
