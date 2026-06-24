@@ -89,15 +89,17 @@ async function run() {
     const physRpx = halfH * Math.tan(Math.asin(Math.min(1, 27.27 / dMoon))) / Math.tan(fov / 2)
     let moonRpx: number
     if (lunarOn) {
-      // Moon scales proportionally with Earth — both zoom in/out together.
-      // Cap at scale 1.5 prevents a blob at the low altitude when the toggle first fires.
+      // Moon size tracks Earth's apparent size directly (pure proportional), so the two
+      // zoom in and out together. Ratio 0.45 of Earth's radius reads "small but visible".
+      // Cap at scale 1.2 only to stop a blob in the first frames when the toggle fires
+      // while the camera is still zoomed in close (Earth filling the screen).
       const dEarth = Math.hypot(cam.x, cam.y, cam.z) || 1
       const earthRpx = halfH * Math.tan(Math.asin(Math.min(1, 100 / dEarth))) / Math.tan(fov / 2)
-      moonRpx = 0.8 * earthRpx
+      moonRpx = 0.45 * earthRpx
     } else {
       moonRpx = physRpx
     }
-    const scaleMax = lunarOn ? 1.5 : 5
+    const scaleMax = lunarOn ? 1.2 : 5
     moon.setScale(Math.min(scaleMax, Math.max(0.02, moonRpx / 23.8))) // 23.8px = rendered disk radius at scale 1
     clipBehindEarth({ el: moon.el, halfSize: 42, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
     for (const b of sky.bodies) {

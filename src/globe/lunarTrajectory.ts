@@ -73,12 +73,16 @@ export interface LunarTrajectory {
   hide(): void
 }
 
-/** Renders the trajectory as a true 3-D dashed line (depth-occluded by the Earth) via globe.gl's custom layer. */
+/**
+ * Renders the trajectory as a true 3-D dashed line (depth-occluded by the Earth).
+ * The line is added directly to globe.gl's THREE scene rather than via the custom-layer
+ * slot — that slot is a single global accessor owned by the flight dart (dartLayer), and
+ * sharing it makes whichever module registers last hijack the other's object.
+ */
 export function createLunarTrajectory(globe: any): LunarTrajectory {
   let traj: Trajectory | null = null
   let line: any = null
   const mat = new THREE.LineDashedMaterial({ color: 0x9fe6ff, transparent: true, opacity: 0.95, dashSize: 70, gapSize: 45, depthWrite: false })
-  globe.customThreeObject((d: any) => d.__obj).customThreeObjectUpdate(() => {})
 
   const indexForFraction = (f: number): number => {
     if (!traj) return 0
@@ -88,6 +92,10 @@ export function createLunarTrajectory(globe: any): LunarTrajectory {
     return k
   }
 
+  const removeLine = () => {
+    if (line) { globe.scene().remove(line); line.geometry.dispose(); line = null }
+  }
+
   return {
     setPath(t) {
       traj = t
@@ -95,17 +103,17 @@ export function createLunarTrajectory(globe: any): LunarTrajectory {
       for (const p of t.points) { const c = globe.getCoords(p.lat, p.lng, p.alt); pos.push(c.x, c.y, c.z) }
       const geom = new THREE.BufferGeometry()
       geom.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-      if (line) line.geometry.dispose()
+      removeLine()
       line = new THREE.Line(geom, mat)
       line.computeLineDistances()
       line.geometry.setDrawRange(0, 0)
-      globe.customLayerData([{ __obj: line }])
+      globe.scene().add(line)
     },
     setReveal(fraction) {
       if (!line || !traj) return
       line.geometry.setDrawRange(0, indexForFraction(fraction))
     },
-    hide() { globe.customLayerData([]); if (line) { line.geometry.dispose(); line = null } },
+    hide() { removeLine() },
   }
 }
 
