@@ -24,6 +24,7 @@ const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DE
 const fmt = (ms: number) => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2,'0')} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
 const pad = (n: number) => String(n).padStart(2, '0')
 const fmtDateTime = (ms: number) => { const d = new Date(ms); return `${fmt(ms)} · ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}z` }
+const LUNAR_MOON_SCALE = 0.9 // fixed on-screen Moon size in lunar-return mode (camera-independent; bigger = larger disk)
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
@@ -82,25 +83,20 @@ async function run() {
   // big bodies get the limb-clip; tiny ones (planets) just hide when behind.
   const applyOcclusion = () => {
     const cam = scene.cameraPos()
-    const fov = ((scene.globe.camera?.()?.fov) ?? 50) * Math.PI / 180
-    const halfH = viewport.clientHeight / 2
-    const mp = geoToCartesian(moon.datum.lat, moon.datum.lng, moon.datum.alt, 100)
-    const dMoon = Math.hypot(mp.x - cam.x, mp.y - cam.y, mp.z - cam.z) || 1
-    const physRpx = halfH * Math.tan(Math.asin(Math.min(1, 27.27 / dMoon))) / Math.tan(fov / 2)
-    let moonRpx: number
     if (lunarOn) {
-      // Moon size tracks Earth's apparent size directly (pure proportional), so the two
-      // zoom in and out together. Ratio 0.45 of Earth's radius reads "small but visible".
-      // Cap at scale 1.2 only to stop a blob in the first frames when the toggle fires
-      // while the camera is still zoomed in close (Earth filling the screen).
-      const dEarth = Math.hypot(cam.x, cam.y, cam.z) || 1
-      const earthRpx = halfH * Math.tan(Math.asin(Math.min(1, 100 / dEarth))) / Math.tan(fov / 2)
-      moonRpx = 0.45 * earthRpx
+      // In lunar mode the Moon holds a FIXED on-screen size — it must NOT resize as the
+      // camera zooms out to the mission view, or as the user zooms within it. A camera-
+      // independent constant keeps it put; tune LUNAR_MOON_SCALE for a bigger/smaller disk.
+      moon.setScale(LUNAR_MOON_SCALE)
     } else {
-      moonRpx = physRpx
+      // Normal view: physical apparent size — the Moon scales naturally with camera distance.
+      const fov = ((scene.globe.camera?.()?.fov) ?? 50) * Math.PI / 180
+      const halfH = viewport.clientHeight / 2
+      const mp = geoToCartesian(moon.datum.lat, moon.datum.lng, moon.datum.alt, 100)
+      const dMoon = Math.hypot(mp.x - cam.x, mp.y - cam.y, mp.z - cam.z) || 1
+      const physRpx = halfH * Math.tan(Math.asin(Math.min(1, 27.27 / dMoon))) / Math.tan(fov / 2)
+      moon.setScale(Math.min(5, Math.max(0.02, physRpx / 23.8))) // 23.8px = rendered disk radius at scale 1
     }
-    const scaleMax = lunarOn ? 1.2 : 5
-    moon.setScale(Math.min(scaleMax, Math.max(0.02, moonRpx / 23.8))) // 23.8px = rendered disk radius at scale 1
     clipBehindEarth({ el: moon.el, halfSize: 42, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
     for (const b of sky.bodies) {
       if (b.occlude === 'clip') clipBehindEarth({ el: b.el, halfSize: b.halfSize, lat: b.datum.lat, lng: b.datum.lng, alt: b.datum.alt, cam, globe: scene.globe, viewport })
