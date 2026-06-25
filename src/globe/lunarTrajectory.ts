@@ -39,7 +39,7 @@ export interface TrajectoryOpts { samples?: number; bulge?: number; loopRadius?:
 export function buildTrajectoryPoints(moonLat: number, moonLng: number, moonAlt: number, opts: TrajectoryOpts = {}): Trajectory {
   const R = opts.R ?? 100
   const N = opts.samples ?? 260
-  const loopRadius = opts.loopRadius ?? 80 // radius of the swing around the Moon (scene units; Moon radius ≈ 27)
+  const loopRadius = opts.loopRadius ?? 45 // radius of the swing around the Moon (scene units; sized to hug the Moon disk, ~28 units equiv at the lunar view)
 
   const mc = geoToCartesian(moonLat, moonLng, moonAlt, R)
   const M: V3 = [mc.x, mc.y, mc.z]
