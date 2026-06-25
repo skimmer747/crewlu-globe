@@ -6,6 +6,8 @@ const MOON_ALT = 59.3 // real Moon distance ≈ 60.3 Earth-radii from center (al
 export interface MoonLayer {
   datum: { type: 'moon'; lat: number; lng: number; alt: number }
   el: HTMLElement
+  scaleEl: HTMLElement  // inner element carrying the CSS scale — the occlusion mask target
+  scale: number         // current scale factor applied to scaleEl
   update(date: Date): void
   refreshOcclusion(cam: { x: number; y: number; z: number }): void
   setScale(k: number): void
@@ -19,9 +21,11 @@ export function createMoonLayer(): MoonLayer {
   const shadow = el.querySelector<SVGCircleElement>('.moonShadow')!
   const chip = el.querySelector<HTMLDivElement>('.moon-chip')!
   const datum = { type: 'moon' as const, lat: 0, lng: 0, alt: MOON_ALT }
+  let curK = 1
 
   return {
-    datum, el,
+    datum, el, scaleEl,
+    get scale() { return curK },
     update(date) {
       const p = subLunarPoint(date); datum.lat = p.lat; datum.lng = p.lng
       const ph = moonPhase(date)
@@ -30,7 +34,7 @@ export function createMoonLayer(): MoonLayer {
       chip.textContent = `${ph.icon} ${ph.name} · ${Math.round(ph.illum * 100)}%`
     },
     refreshOcclusion(cam) { el.style.opacity = isOccluded(cam, datum.lat, datum.lng, datum.alt) ? '0' : '1' },
-    setScale(k) { scaleEl.style.transform = `scale(${k})` },
+    setScale(k) { curK = k; scaleEl.style.transform = `scale(${k})` },
   }
 }
 

@@ -8,7 +8,7 @@ import { groupIntoTrips } from './data/trips'
 import { beaconHome, defaultWindow, legsInWindow, splitAtPlayhead } from './data/schedule'
 import { slerp } from './astro/geo'
 import { isOccluded, geoToCartesian } from './globe/occlusion'
-import { clipBehindEarth } from './globe/skyOcclusion'
+import { clipBehindEarth, featherBehindEarth } from './globe/skyOcclusion'
 import { createSkyLayer } from './globe/skyLayer'
 import { createGlobeScene } from './globe/globeScene'
 import { configureArcs, setArcs, configurePointClick } from './globe/arcsLayer'
@@ -95,7 +95,9 @@ async function run() {
     // where the Moon is off-screen anyway). A lower cap froze the Moon at a fixed size while
     // zoomed in, so it couldn't shrink with Earth until Earth had nearly caught down to it.
     moon.setScale(Math.min(10, Math.max(0.02, (MOON_EARTH_RATIO * earthRpx) / 23.8))) // 23.8px = rendered disk radius at scale 1
-    clipBehindEarth({ el: moon.el, halfSize: 42, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
+    // Feather the Moon behind Earth (soft fade across the atmosphere) instead of a hard limb clip,
+    // so it recedes behind the blue glow rather than looking cut out. Mask rides the scaled inner el.
+    featherBehindEarth({ maskEl: moon.scaleEl, boxHalf: 42, scale: moon.scale, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
     for (const b of sky.bodies) {
       if (b.occlude === 'clip') clipBehindEarth({ el: b.el, halfSize: b.halfSize, lat: b.datum.lat, lng: b.datum.lng, alt: b.datum.alt, cam, globe: scene.globe, viewport })
       else b.el.style.opacity = isOccluded(cam, b.datum.lat, b.datum.lng, b.datum.alt) ? '0' : '1'
