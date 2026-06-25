@@ -7,7 +7,7 @@ import { flightsToLegs, statsFor, computeAirportStats } from './data/transform'
 import { groupIntoTrips } from './data/trips'
 import { beaconHome, defaultWindow, legsInWindow, splitAtPlayhead } from './data/schedule'
 import { slerp } from './astro/geo'
-import { isOccluded } from './globe/occlusion'
+import { isOccluded, geoToCartesian } from './globe/occlusion'
 import { clipBehindEarth } from './globe/skyOcclusion'
 import { createSkyLayer } from './globe/skyLayer'
 import { createGlobeScene } from './globe/globeScene'
@@ -156,7 +156,10 @@ async function run() {
   let lunarOn = false, revealRaf = 0
   // Rebuild the lunar line + readout from the current miles & Moon position (called on toggle and on every timeline change).
   const refreshLunar = (animate: boolean) => {
-    lunar.setPath(buildTrajectoryPoints(moon.datum.lat, moon.datum.lng, moon.datum.alt))
+    // Orient the swing to face the lunar-return vantage (camera sits at lat 0, lng moonLng+90).
+    // Use that deterministic direction rather than the live camera, which is still mid-fly-in.
+    const camDir = geoToCartesian(0, moon.datum.lng + 90, 0, 100)
+    lunar.setPath(buildTrajectoryPoints(moon.datum.lat, moon.datum.lng, moon.datum.alt, { cam: camDir }))
     const laps = lunarReturns(currentMiles)
     hud.setLunarReadout(`DISTANCE FLOWN  ${Math.round(currentMiles).toLocaleString()} NM\nEARTH–MOON RETURN  ${LUNAR_RETURN_NM.toLocaleString()} NM\n= ${laps.toFixed(2)} LUNAR RETURNS`)
     const target = Math.min(1, laps)

@@ -30,7 +30,7 @@ function cartesianToGeo(p: V3, R: number): { lat: number; lng: number; alt: numb
 export interface GeoPoint { lat: number; lng: number; alt: number }
 export interface Trajectory { points: GeoPoint[]; cum: number[]; length: number }
 
-export interface TrajectoryOpts { samples?: number; bulge?: number; loopRadius?: number; R?: number }
+export interface TrajectoryOpts { samples?: number; bulge?: number; loopRadius?: number; R?: number; cam?: { x: number; y: number; z: number } }
 
 /**
  * One full Earth → loop-around-Moon → Earth "free-return" path, sampled as geo points
@@ -44,10 +44,20 @@ export function buildTrajectoryPoints(moonLat: number, moonLng: number, moonAlt:
   const mc = geoToCartesian(moonLat, moonLng, moonAlt, R)
   const M: V3 = [mc.x, mc.y, mc.z]
   const u = norm(M)                                  // Earth -> Moon
-  let v = sub([0, 1, 0], scale(u, dot([0, 1, 0], u)))
-  if (mag(v) < 1e-6) v = sub([1, 0, 0], scale(u, dot([1, 0, 0], u)))
-  v = norm(v)
-  const w = norm(cross(u, v))                        // a direction across the Earth–Moon axis
+  // The loop swings across `w`. Pick `w` perpendicular to BOTH the Earth–Moon line and the
+  // view direction, so the swing spreads sideways across the screen and reads as an arc around
+  // the Moon. The old north-based `w` sat nearly along the lunar-view camera axis (which is 90°
+  // around from the Moon), collapsing the loop edge-on. Fall back to north if no camera given.
+  let w: V3
+  const cw = opts.cam ? cross(u, norm([opts.cam.x, opts.cam.y, opts.cam.z])) : ([0, 0, 0] as V3)
+  if (opts.cam && mag(cw) > 1e-6) {
+    w = norm(cw)
+  } else {
+    let v = sub([0, 1, 0], scale(u, dot([0, 1, 0], u)))
+    if (mag(v) < 1e-6) v = sub([1, 0, 0], scale(u, dot([1, 0, 0], u)))
+    v = norm(v)
+    w = norm(cross(u, v))
+  }
 
   const sideA = add(M, scale(w, -loopRadius))             // out-leg reaches the Moon on this side
   const sideB = add(M, scale(w, loopRadius))             // return-leg departs from the other side
