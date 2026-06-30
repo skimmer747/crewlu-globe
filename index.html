@@ -5,9 +5,101 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>Crewlu · Flight Globe</title>
   <link rel="stylesheet" href="/src/styles.css" />
+  <style>
+    /* Cookie-consent banner (self-contained; mirrors crewlu.net) */
+    #cookie-consent-banner {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.95); color: #fff; padding: 1.5rem;
+      box-shadow: 0 -2px 20px rgba(0,0,0,0.3); z-index: 10000;
+      border-top: 2px solid #06b6d4; display: none;
+      font-family: -apple-system, system-ui, sans-serif;
+    }
+    #cookie-consent-banner.show { display: block; }
+    #cookie-consent-banner .consent-content {
+      max-width: 1200px; margin: 0 auto; display: flex; align-items: center;
+      justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;
+    }
+    #cookie-consent-banner .consent-text { flex: 1; min-width: 280px; }
+    #cookie-consent-banner .consent-text h3 { margin: 0 0 .5rem; font-size: 1.1rem; color: #18bfef; }
+    #cookie-consent-banner .consent-text p { margin: 0; font-size: .9rem; line-height: 1.5; color: #d0d0d0; }
+    #cookie-consent-banner .consent-text a { color: #18bfef; text-decoration: underline; }
+    #cookie-consent-banner .consent-buttons { display: flex; gap: .75rem; flex-wrap: wrap; }
+    #cookie-consent-banner .consent-btn {
+      padding: .75rem 1.5rem; border: none; border-radius: 4px; font-size: .9rem;
+      font-weight: 600; cursor: pointer; transition: all .3s ease; white-space: nowrap;
+    }
+    #cookie-consent-banner .consent-btn-accept { background: #06b6d4; color: #fff; }
+    #cookie-consent-banner .consent-btn-accept:hover { background: #0a9ec8; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(6,182,212,.3); }
+    #cookie-consent-banner .consent-btn-decline { background: transparent; color: #fff; border: 2px solid #555; }
+    #cookie-consent-banner .consent-btn-decline:hover { background: rgba(255,255,255,.1); border-color: #777; }
+    @media screen and (max-width: 768px) {
+      #cookie-consent-banner { padding: 1rem; }
+      #cookie-consent-banner .consent-content { flex-direction: column; align-items: stretch; }
+      #cookie-consent-banner .consent-buttons { width: 100%; flex-direction: column; }
+      #cookie-consent-banner .consent-btn { width: 100%; text-align: center; }
+    }
+  </style>
+  <!-- Google Analytics 4 — loads only with user consent (same property as crewlu.net) -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    if (localStorage.getItem('crewlu_analytics_consent') === 'granted') {
+      loadGoogleAnalytics();
+    }
+    function loadGoogleAnalytics() {
+      gtag('consent', 'default', { 'analytics_storage': 'denied', 'ad_storage': 'denied' });
+      gtag('consent', 'update', { 'analytics_storage': 'granted' });
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-1LNXKYWTL9';
+      document.head.appendChild(s);
+      s.onload = function () {
+        gtag('js', new Date());
+        gtag('config', 'G-1LNXKYWTL9', {
+          'anonymize_ip': true,
+          'allow_google_signals': false,
+          'allow_ad_personalization_signals': false
+        });
+      };
+    }
+    window.grantAnalyticsConsent = function () {
+      localStorage.setItem('crewlu_analytics_consent', 'granted');
+      localStorage.setItem('crewlu_analytics_consent_date', new Date().toISOString());
+      loadGoogleAnalytics();
+      hideConsentBanner();
+    };
+    window.denyAnalyticsConsent = function () {
+      localStorage.setItem('crewlu_analytics_consent', 'denied');
+      localStorage.setItem('crewlu_analytics_consent_date', new Date().toISOString());
+      hideConsentBanner();
+    };
+    function hideConsentBanner() {
+      var b = document.getElementById('cookie-consent-banner');
+      if (b) { b.style.display = 'none'; }
+    }
+  </script>
 </head>
 <body>
   <div id="app"></div>
   <script type="module" src="/src/main.ts"></script>
+  <div id="cookie-consent-banner">
+    <div class="consent-content">
+      <div class="consent-text">
+        <h3>🍪 Cookie Consent</h3>
+        <p>We use Google Analytics to understand how visitors interact with the Flight Globe. This collects data such as your IP address (anonymized), browser type, device information, and pages visited. You can <a href="https://crewlu.net/privacy-policy.html#data-collection-analytics">learn more</a> in our Privacy Policy or choose below.</p>
+      </div>
+      <div class="consent-buttons">
+        <button class="consent-btn consent-btn-accept" onclick="grantAnalyticsConsent()">Accept Analytics</button>
+        <button class="consent-btn consent-btn-decline" onclick="denyAnalyticsConsent()">Decline</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (!localStorage.getItem('crewlu_analytics_consent')) {
+        document.getElementById('cookie-consent-banner').classList.add('show');
+      }
+    });
+  </script>
 </body>
 </html>
