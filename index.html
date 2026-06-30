@@ -6,37 +6,33 @@
   <title>Crewlu · Flight Globe</title>
   <link rel="stylesheet" href="/src/styles.css" />
   <style>
-    /* Cookie-consent banner (self-contained; mirrors crewlu.net) */
+    /* Cookie-consent banner (compact; self-contained) */
     #cookie-consent-banner {
       position: fixed; bottom: 0; left: 0; right: 0;
-      background: rgba(0,0,0,0.95); color: #fff; padding: 1.5rem;
-      box-shadow: 0 -2px 20px rgba(0,0,0,0.3); z-index: 10000;
-      border-top: 2px solid #06b6d4; display: none;
+      background: rgba(0,0,0,0.95); color: #fff; padding: .45rem .75rem;
+      box-shadow: 0 -1px 10px rgba(0,0,0,0.35); z-index: 10000;
+      border-top: 1px solid #06b6d4; display: none;
       font-family: -apple-system, system-ui, sans-serif;
     }
     #cookie-consent-banner.show { display: block; }
     #cookie-consent-banner .consent-content {
-      max-width: 1200px; margin: 0 auto; display: flex; align-items: center;
-      justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;
+      max-width: 1100px; margin: 0 auto; display: flex; align-items: center;
+      justify-content: space-between; gap: .35rem .75rem; flex-wrap: wrap;
     }
-    #cookie-consent-banner .consent-text { flex: 1; min-width: 280px; }
-    #cookie-consent-banner .consent-text h3 { margin: 0 0 .5rem; font-size: 1.1rem; color: #18bfef; }
-    #cookie-consent-banner .consent-text p { margin: 0; font-size: .9rem; line-height: 1.5; color: #d0d0d0; }
-    #cookie-consent-banner .consent-text a { color: #18bfef; text-decoration: underline; }
-    #cookie-consent-banner .consent-buttons { display: flex; gap: .75rem; flex-wrap: wrap; }
+    #cookie-consent-banner .consent-text { margin: 0; font-size: .75rem; line-height: 1.3; color: #cfcfcf; flex: 1 1 auto; min-width: 0; }
+    #cookie-consent-banner .consent-text a { color: #18bfef; text-decoration: underline; white-space: nowrap; }
+    #cookie-consent-banner .consent-buttons { display: flex; gap: .4rem; flex-shrink: 0; }
     #cookie-consent-banner .consent-btn {
-      padding: .75rem 1.5rem; border: none; border-radius: 4px; font-size: .9rem;
-      font-weight: 600; cursor: pointer; transition: all .3s ease; white-space: nowrap;
+      padding: .28rem .7rem; border: none; border-radius: 4px; font-size: .75rem;
+      font-weight: 600; cursor: pointer; transition: background .2s ease, border-color .2s ease; white-space: nowrap;
     }
     #cookie-consent-banner .consent-btn-accept { background: #06b6d4; color: #fff; }
-    #cookie-consent-banner .consent-btn-accept:hover { background: #0a9ec8; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(6,182,212,.3); }
-    #cookie-consent-banner .consent-btn-decline { background: transparent; color: #fff; border: 2px solid #555; }
-    #cookie-consent-banner .consent-btn-decline:hover { background: rgba(255,255,255,.1); border-color: #777; }
-    @media screen and (max-width: 768px) {
-      #cookie-consent-banner { padding: 1rem; }
-      #cookie-consent-banner .consent-content { flex-direction: column; align-items: stretch; }
-      #cookie-consent-banner .consent-buttons { width: 100%; flex-direction: column; }
-      #cookie-consent-banner .consent-btn { width: 100%; text-align: center; }
+    #cookie-consent-banner .consent-btn-accept:hover { background: #0a9ec8; }
+    #cookie-consent-banner .consent-btn-decline { background: transparent; color: #fff; border: 1px solid #555; padding: .28rem .6rem; }
+    #cookie-consent-banner .consent-btn-decline:hover { border-color: #999; }
+    @media screen and (max-width: 600px) {
+      #cookie-consent-banner .consent-text { flex-basis: 100%; text-align: center; }
+      #cookie-consent-banner .consent-buttons { width: 100%; justify-content: center; }
     }
   </style>
   <!-- Google Analytics 4 — loads only with user consent (same property as crewlu.net) -->
@@ -84,12 +80,9 @@
   <script type="module" src="/src/main.ts"></script>
   <div id="cookie-consent-banner">
     <div class="consent-content">
-      <div class="consent-text">
-        <h3>🍪 Cookie Consent</h3>
-        <p>We use Google Analytics to understand how visitors interact with the Flight Globe. This collects data such as your IP address (anonymized), browser type, device information, and pages visited. You can <a href="https://crewlu.net/privacy-policy.html#data-collection-analytics">learn more</a> in our Privacy Policy or choose below.</p>
-      </div>
+      <p class="consent-text">🍪 We use Google Analytics (IP anonymized) to measure usage. <a href="https://crewlu.net/privacy-policy.html#data-collection-analytics">Learn more</a></p>
       <div class="consent-buttons">
-        <button class="consent-btn consent-btn-accept" onclick="grantAnalyticsConsent()">Accept Analytics</button>
+        <button class="consent-btn consent-btn-accept" onclick="grantAnalyticsConsent()">Accept</button>
         <button class="consent-btn consent-btn-decline" onclick="denyAnalyticsConsent()">Decline</button>
       </div>
     </div>
