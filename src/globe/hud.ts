@@ -161,5 +161,5 @@ const HUD_HTML = `
 
 <div id="eventChip"></div>
 
-<div id="tip">DRAG TO SPIN · SCROLL TO ZOOM · MOVE MOUSE FOR PARALLAX</div>
+<div id="tip">DRAG TO SPIN · SCROLL TO ZOOM · MOVE MOUSE FOR PARALLAX<br><span style="opacity:.45;font-size:8px">EARTH IMAGERY · SOLARSYSTEMSCOPE.COM · CC-BY-4.0</span></div>
 `

@@ -43,6 +43,19 @@ export function createGlobeScene(host: HTMLElement, viewport: HTMLElement): Glob
     new THREE.Vector2(host.clientWidth || 800, host.clientHeight || 600), 0.55, 0.4, 0.85)
   globe.postProcessingComposer().addPass(bloom)
 
+  // Progressive detail: the first time the camera comes in close, swap the 4K maps
+  // for 8K (guarded by GPU max texture size; ~8MB fetched once, only for engaged users).
+  let hiRes = false
+  const maybeLoadHiRes = () => {
+    if (hiRes) return
+    const p = globe.camera().position
+    if (Math.hypot(p.x, p.y, p.z) > 320) return
+    hiRes = true
+    if (globe.renderer().capabilities.maxTextureSize < 8192) return
+    loader.load('/textures/earth-day-8k.jpg', (t: any) => { t.anisotropy = maxAniso; material.uniforms.dayTexture.value = t })
+    loader.load('/textures/earth-night-8k.jpg', (t: any) => { t.anisotropy = maxAniso; material.uniforms.nightTexture.value = t })
+  }
+
   const size = () => {
     globe.width(host.clientWidth).height(host.clientHeight)
     bloom.setSize(host.clientWidth || 800, host.clientHeight || 600)
@@ -57,6 +70,7 @@ export function createGlobeScene(host: HTMLElement, viewport: HTMLElement): Glob
   ctr.addEventListener('change', () => {
     const pov = globe.pointOfView()
     material.uniforms.globeRotation.value.set(pov.lng, pov.lat)
+    maybeLoadHiRes()
   })
 
   // The viewport parallax tilt (perspective + rotateX/Y + scale) has been removed.
