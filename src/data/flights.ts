@@ -22,7 +22,7 @@ export async function fetchFlights(client: SupabaseClient): Promise<FlightRow[]>
   return all
 }
 
-/** Normalized 3-char base code ('SDFZ' -> 'SDF'); null for empty/absent values. */
+/** Base code normalized to its first 3 chars, uppercased ('SDFZ' -> 'SDF'); null for empty/absent. */
 export function normalizeBase(v: string | null | undefined): string | null {
   const s = (v ?? '').trim().toUpperCase()
   return s ? s.slice(0, 3) : null

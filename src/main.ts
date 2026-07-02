@@ -2,7 +2,7 @@ import './styles.css'
 import { supabase } from './supabase'
 import { requireSession } from './auth/authView'
 import { loadAirports } from './data/airports'
-import { fetchFlights } from './data/flights'
+import { fetchFlights, fetchTripBases } from './data/flights'
 import { flightsToLegs, statsFor, computeAirportStats } from './data/transform'
 import { groupIntoTrips } from './data/trips'
 import { beaconHome, defaultWindow, legsInWindow, splitAtPlayhead } from './data/schedule'
@@ -51,9 +51,16 @@ async function run() {
   const host = app.querySelector<HTMLDivElement>('#globe')!
   const hudHost = app.querySelector<HTMLDivElement>('#hud')!
 
-  const [airports, flights] = await Promise.all([loadAirports(), demo ? Promise.resolve(demoFlights()) : fetchFlights(supabase)])
+  const [airports, flights, baseByTrip] = await Promise.all([
+    loadAirports(),
+    demo ? Promise.resolve(demoFlights()) : fetchFlights(supabase),
+    // base-at-the-time map for RECORDS; failure degrades to no exclusion, never blocks the globe
+    demo ? Promise.resolve(new Map<string, string>())
+         : fetchTripBases(supabase).catch((e) => { console.warn('trip bases unavailable', e); return new Map<string, string>() }),
+  ])
   app.querySelector('#acquiring')?.remove()
-  const { legs, dropped } = flightsToLegs(flights, airports)
+  if (demo) for (const f of flights) if (f.trip_id) baseByTrip.set(f.trip_id, 'SDF') // demo line is SDF-based
+  const { legs, dropped } = flightsToLegs(flights, airports, baseByTrip)
   if (dropped) console.warn(`${dropped} legs dropped (unresolved airports or undated rows)`)
   const airportStats = computeAirportStats(legs)
 
