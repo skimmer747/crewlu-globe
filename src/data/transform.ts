@@ -24,7 +24,7 @@ const MAX_TAXI_IN_MS = 3 * 60 * 60 * 1000
 /** A sched-vs-actual delta beyond this is bad data, not a record-setting delay. */
 export const MAX_CRED_DELTA_MS = 6 * 60 * 60 * 1000
 
-export function flightsToLegs(rows: FlightRow[], airports: AirportIndex): { legs: Leg[]; dropped: number } {
+export function flightsToLegs(rows: FlightRow[], airports: AirportIndex, baseByTrip?: Map<string, string>): { legs: Leg[]; dropped: number } {
   const legs: Leg[] = []
   let dropped = 0
   for (const r of rows) {
@@ -60,6 +60,7 @@ export function flightsToLegs(rows: FlightRow[], airports: AirportIndex): { legs
       aircraft: r.aircraft_type,
       tail: r.tail_number,
       tripId: r.trip_id,
+      base: (r.trip_id != null ? baseByTrip?.get(r.trip_id) : undefined) ?? null,
     })
   }
   legs.sort((a, b) => a.t - b.t)

@@ -165,3 +165,18 @@ describe('flightsToLegs', () => {
     expect(air.blockMs).toBe(air.landing - air.takeoff)
   })
 })
+
+describe('flightsToLegs baseByTrip', () => {
+  it('stamps each leg with its trip base; missing entries and absent map -> null', () => {
+    const rows = [
+      row({ id: 'a', departure: 'SDF', arrival: 'ANC', scheduled_block_out_time: '2024-02-11', trip_id: 'T1' }),
+      row({ id: 'b', departure: 'ANC', arrival: 'SDF', scheduled_block_out_time: '2024-02-12', trip_id: 'T2' }),
+      row({ id: 'c', departure: 'SDF', arrival: 'ANC', scheduled_block_out_time: '2024-02-13', trip_id: null }),
+    ]
+    const bases = new Map([['T1', 'ANC']])
+    const { legs } = flightsToLegs(rows, idx, bases)
+    expect(legs.map((l) => l.base)).toEqual(['ANC', null, null])
+    const { legs: plain } = flightsToLegs(rows, idx)
+    expect(plain.map((l) => l.base)).toEqual([null, null, null])
+  })
+})
