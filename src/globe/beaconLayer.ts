@@ -33,7 +33,7 @@ export function createBeaconLayer(): BeaconLayer {
     setContrailSink(g) {
       globe = g
       g.pathPoints((d: any) => d.pts).pathPointLat((p: any) => p[0]).pathPointLng((p: any) => p[1])
-        .pathColor((d: any) => d.colors).pathStroke(3.4).pathPointAlt(0.02).pathTransitionDuration(0)
+        .pathColor((d: any) => d.colors).pathStroke(3.4).pathPointAlt((p: any) => p[2] ?? 0.02).pathTransitionDuration(0)
         .pathsData([])
     },
     setAt(lat, lng) { pos.lat = lat; pos.lng = lng; datum.lat = lat; datum.lng = lng; globe?.htmlElementsData(globe.htmlElementsData()) },

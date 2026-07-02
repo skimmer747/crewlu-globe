@@ -112,6 +112,7 @@ export interface DartLayer {
   flyLeg(leg: Leg, durationMs: number): void
   tick(): void
   presence(): number   // 0 = absent, 1 = full size — drives the beacon cross-fade
+  geoPos(): [number, number, number] | null // [lat, lng, alt] while flying — feeds the contrail
   stop(): void
 }
 
@@ -120,6 +121,7 @@ export function createDartLayer(): DartLayer {
   let globe: any = null
   let flying: { leg: Leg; t0: number; dur: number; ang: number; frac: EnvelopeFractions } | null = null
   let pres = 0
+  let lastGeo: [number, number, number] | null = null
 
   const coords = (lat: number, lng: number, alt: number) => {
     const c = globe.getCoords(lat, lng, alt)
@@ -138,7 +140,7 @@ export function createDartLayer(): DartLayer {
     return coords(lat, lng, altAt(p, f.ang, f.frac))
   }
 
-  const hide = () => { pres = 0; object.visible = false; object.scale.setScalar(0) }
+  const hide = () => { pres = 0; lastGeo = null; object.visible = false; object.scale.setScalar(0) }
 
   return {
     object,
@@ -148,6 +150,7 @@ export function createDartLayer(): DartLayer {
     },
     flyLeg(leg, durationMs) { flying = { leg, t0: performance.now(), dur: Math.max(1, durationMs), ang: leg.miles / EARTH_NM, frac: envelopeFractions(leg.landing - leg.takeoff) } },
     presence() { return pres },
+    geoPos() { return lastGeo },
     stop() { flying = null; hide() },
     tick() {
       if (!flying || !globe) { if (pres !== 0) hide(); return }
@@ -155,7 +158,10 @@ export function createDartLayer(): DartLayer {
       pres = envelope(p, flying.frac)
       if (pres <= 0.001) { object.visible = false; object.scale.setScalar(0); if (p >= 1) flying = null; return }
 
-      const pos = at(p, flying)
+      const [glat, glng] = slerp(flying.leg.s, flying.leg.e, clamp01(p))
+      const galt = altAt(p, flying.ang, flying.frac)
+      lastGeo = [glat, glng, galt]
+      const pos = coords(glat, glng, galt)
       // Look a hair up-track to derive a heading; the path's vertical component makes the
       // nose pitch up on climb and down on descent for free.
       const dp = p < 0.5 ? 0.012 : -0.012

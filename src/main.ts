@@ -19,6 +19,7 @@ import { createHud } from './globe/hud'
 import { createTimelineDock, SPEEDS } from './globe/timelineDock'
 import { createPlayback } from './globe/playback'
 import { createLunarTrajectory, buildTrajectoryPoints, lunarReturns, LUNAR_RETURN_NM } from './globe/lunarTrajectory'
+import { createContrail } from './globe/contrail'
 
 const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
 const fmt = (ms: number) => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2,'0')} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
@@ -124,7 +125,27 @@ async function run() {
   // FIX 7: these listeners and the rAF loop persist for the page lifetime.
   // The app mounts once; if a future sign-out→re-render path is added,
   // they must be torn down to avoid double-binding.
-  const loop = () => { beacon.tick(); dart.tick(); beacon.setVeil(dart.presence()); requestAnimationFrame(loop) }; requestAnimationFrame(loop)
+  // The contrail rides the dart: points recorded while it flies, tail-decayed after landing.
+  // pathsData writes are throttled to ~25fps (known DOM-churn hot path) and skipped when empty.
+  const contrail = createContrail()
+  let lastTrailWrite = 0
+  let lastTrailN = 0
+  const loop = () => {
+    beacon.tick(); dart.tick(); beacon.setVeil(dart.presence())
+    const nowMs = performance.now()
+    const g = dart.geoPos()
+    if (g) contrail.push(g[0], g[1], g[2], nowMs)
+    else if (contrail.size()) contrail.decay()
+    if (nowMs - lastTrailWrite >= 40) {
+      lastTrailWrite = nowMs
+      const snap = contrail.snapshot()
+      const n = snap ? snap.pts.length : 0
+      if (n > 0 || lastTrailN > 0) scene.globe.pathsData(snap ? [snap] : [])
+      lastTrailN = n
+    }
+    requestAnimationFrame(loop)
+  }
+  requestAnimationFrame(loop)
 
   const trips = groupIntoTrips(legs)
   const now = Date.now()
