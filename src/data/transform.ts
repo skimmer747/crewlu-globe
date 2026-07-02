@@ -21,6 +21,8 @@ const MAX_AIR_MS = 20 * 60 * 60 * 1000
 const MAX_BLOCK_MS = 26 * 60 * 60 * 1000
 /** Longest believable taxi-in; a block-in further past landing than this is garbage. */
 const MAX_TAXI_IN_MS = 3 * 60 * 60 * 1000
+/** A sched-vs-actual delta beyond this is bad data, not a record-setting delay. */
+export const MAX_CRED_DELTA_MS = 6 * 60 * 60 * 1000
 
 export function flightsToLegs(rows: FlightRow[], airports: AirportIndex): { legs: Leg[]; dropped: number } {
   const legs: Leg[] = []
@@ -94,10 +96,14 @@ export function statsFor(legs: Leg[], airports: AirportIndex): Stats {
     if (l.dh) rodeMiles += l.miles
     else { flewMiles += l.miles; flewBlockMs += l.blockMs }
     // On-time = actual arrival within 14 min of scheduled (A14). Prefer the block-in pair,
-    // fall back to the landing pair; legs missing either side don't count against the pilot.
+    // fall back to the landing pair; legs missing either side don't count against the pilot,
+    // and a delta beyond credibility (±6h) is garbage data, not a record delay.
     const pair = l.act.in != null && l.sched.in != null ? [l.act.in, l.sched.in]
       : l.act.on != null && l.sched.on != null ? [l.act.on, l.sched.on] : null
-    if (pair) { comparable++; if (pair[0] <= pair[1] + 14 * 60000) onTime++ }
+    if (pair && Math.abs(pair[0] - pair[1]) <= MAX_CRED_DELTA_MS) {
+      comparable++
+      if (pair[0] <= pair[1] + 14 * 60000) onTime++
+    }
   }
   const hours = Math.round(flewBlockMs / 3600000) // real block time, operated legs only
   const onTimePct = comparable ? Math.round((onTime / comparable) * 100) : null

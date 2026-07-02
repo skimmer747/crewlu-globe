@@ -33,6 +33,12 @@ describe('arcsLayer helpers', () => {
   it('legDeltaLine falls back to block only without comparable pairs', () => {
     expect(legDeltaLine(leg({ blockMs: 90 * 60000 }))).toBe('BLOCK 1+30')
   })
+  it('legDeltaLine suppresses garbage deltas beyond credibility', () => {
+    const l = leg({ blockMs: 5 * 3600000,
+      sched: { out: null, off: null, on: 18 * 3600000, in: null },
+      act: { out: null, off: null, on: 3 * 3600000, in: null } }) // "landed" 15h early: junk
+    expect(legDeltaLine(l)).toBe('BLOCK 5+00')
+  })
   it('combineArcData tags ghosts and keeps order solid-first', () => {
     const out = combineArcData([leg({ id: 's' })], [leg({ id: 'g' })])
     expect(out.map(l => l.id)).toEqual(['s', 'g'])

@@ -1,4 +1,5 @@
 import type { Leg } from '../model'
+import { MAX_CRED_DELTA_MS } from '../data/transform'
 
 const FLEW = '#5fe0ff'
 const DH = '#ffb15f'
@@ -26,11 +27,14 @@ const fmtBlock = (ms: number): string => {
   return `${Math.floor(m / 60)}+${String(m % 60).padStart(2, '0')}`
 }
 
-/** "OFF +0:14 · ON −0:06 · BLOCK 7+42 (SKED 7+55)" — deltas only where both sides exist. */
+/** "OFF +0:14 · ON −0:06 · BLOCK 7+42 (SKED 7+55)" — deltas only where both sides exist
+ *  and the difference is credible (garbage timestamps produce ±hours-scale noise). */
 export function legDeltaLine(d: Leg): string {
   const parts: string[] = []
-  if (d.act.off != null && d.sched.off != null) parts.push(`OFF ${fmtDelta(d.act.off - d.sched.off)}`)
-  if (d.act.on != null && d.sched.on != null) parts.push(`ON ${fmtDelta(d.act.on - d.sched.on)}`)
+  const cred = (a: number | null, s: number | null): a is number =>
+    a != null && s != null && Math.abs(a - s) <= MAX_CRED_DELTA_MS
+  if (cred(d.act.off, d.sched.off)) parts.push(`OFF ${fmtDelta(d.act.off - d.sched.off!)}`)
+  if (cred(d.act.on, d.sched.on)) parts.push(`ON ${fmtDelta(d.act.on - d.sched.on!)}`)
   let block = `BLOCK ${fmtBlock(d.blockMs)}`
   const schedBlock = d.sched.in != null && d.sched.out != null ? d.sched.in - d.sched.out : null
   if (schedBlock != null && Math.abs(schedBlock - d.blockMs) >= 60000) block += ` (SKED ${fmtBlock(schedBlock)})`

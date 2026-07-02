@@ -128,6 +128,17 @@ describe('flightsToLegs', () => {
     expect(s.rodeMiles).toBeGreaterThan(0)
     expect(s.onTimePct).toBe(50)
   })
+  it('on-time pct ignores garbage arrival pairs (delta beyond credibility)', () => {
+    const { legs } = flightsToLegs([
+      row({ id: 'ok', departure: 'SDF', arrival: 'ANC', block_out_time: '2024-02-11T10:00:00Z',
+        take_off_time: '2024-02-11T10:15:00Z', landing_time: '2024-02-11T16:00:00Z',
+        block_in_time: '2024-02-11T16:10:00Z', scheduled_block_in_time: '2024-02-11T16:05:00Z' }),
+      row({ id: 'junk', departure: 'ANC', arrival: 'PVG', block_out_time: '2024-02-12T10:00:00Z',
+        take_off_time: '2024-02-12T10:15:00Z', scheduled_landing_time: '2024-02-12T18:00:00Z',
+        landing_time: '2024-02-12T03:00:00Z' }), // actual "landing" 15h before schedule: garbage
+    ], idx)
+    expect(statsFor(legs, idx).onTimePct).toBe(100) // junk pair excluded, not counted late/early
+  })
   it('layover runs block-in to next block-out', () => {
     const { legs } = flightsToLegs([
       row({ id: 'a', departure: 'SDF', arrival: 'ANC', block_out_time: '2024-02-11T10:00:00Z',
