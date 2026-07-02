@@ -98,7 +98,6 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
 #tlSpeed::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#2fd6ff;box-shadow:0 0 10px #2fd6ff;cursor:pointer}
 #tlSpeed::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#2fd6ff;cursor:pointer;border:none}
 .btn{width:38px;height:38px;border-radius:9px;background:rgba(8,20,34,.6);border:1px solid rgba(47,214,255,.3);color:#cfeaff;font-size:17px;cursor:pointer;backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center}
-.btn.on{color:#04121e;background:#5fe0ff;border-color:#5fe0ff;box-shadow:0 0 14px rgba(95,224,255,.6)}
 
 /* Touch devices (any orientation) + narrow viewports: enlarge hit targets & labels.
    Handle precision on a fine pointer is preserved by the JS hit tolerance, not these sizes. */

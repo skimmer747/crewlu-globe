@@ -24,7 +24,6 @@ import { sunElevationDeg } from './astro/sun'
 import { demoFlights } from './data/demoFlights'
 import { parseDeepLink } from './globe/deeplink'
 import { composeShareCard } from './globe/shareCard'
-import { chasePov, altForLeg } from './globe/chaseCam'
 
 const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
 const fmt = (ms: number) => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2,'0')} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
@@ -144,9 +143,8 @@ async function run() {
   const contrail = createContrail()
   let lastTrailWrite = 0
   let lastTrailN = 0
-  let tickChase: () => void = () => {} // assigned after playback wiring (needs altForLeg)
   const loop = () => {
-    beacon.tick(); dart.tick(); beacon.setVeil(dart.presence()); tickChase()
+    beacon.tick(); dart.tick(); beacon.setVeil(dart.presence())
     const nowMs = performance.now()
     const g = dart.geoPos()
     if (g) contrail.push(g[0], g[1], g[2], nowMs)
@@ -247,24 +245,8 @@ async function run() {
 
   const dock = createTimelineDock({ legs, trips, windowStart: win.start, windowEnd: win.end, playhead, now })
 
-  // Chase cam: while a leg flies (and FOLLOW is on) the camera trails just behind the dart,
-  // hugging the surface at cruise (see chaseCam.ts for why it must fly this low). Camera-only —
-  // per-frame pointOfView with 0ms transitions; never touches the canvas (raycasting constraint).
-  let follow = true
-  let chase: { leg: (typeof legs)[number]; t0: number; dur: number } | null = null
-  let lastFly: { leg: (typeof legs)[number]; t0: number; dur: number } | null = null // most recent leg flight, so toggling FOLLOW mid-leg can hop on
-  const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
-  tickChase = () => {
-    if (!chase) return
-    const p = clamp01((performance.now() - chase.t0) / chase.dur)
-    const leg = chase.leg
-    if (p >= 1) {
-      chase = null
-      scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, 800)
-      return
-    }
-    scene.globe.pointOfView(chasePov(leg.s, leg.e, leg.miles, p), 0)
-  }
+  // Camera zoom tracks leg length: short hops zoom way in, long hauls pull out (lower altitude = closer).
+  const altForLeg = (miles: number) => Math.min(2.6, Math.max(0.6, 0.6 + miles * 0.00033))
 
   const playback = createPlayback({
     legs: () => legsInWindow(legs, { start: win.start, end: win.end }),
@@ -279,13 +261,12 @@ async function run() {
       beacon.flyLeg(leg, dur)
       dart.flyLeg(leg, dur) // the 3D dart rides the same leg, in sync
 
-      lastFly = { leg, t0: performance.now(), dur }
-      if (follow) chase = lastFly // ride along behind the dart
-      else scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, dur)
+      // camera follows the plane to its arrival, zoomed to the leg's length
+      scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, dur)
     },
     onPlayhead: (ms) => { playhead = ms; dock.setPlayhead(ms); draw(false); checkGoldenHour(ms) },
-    onDone: () => { activeLegId = null; chase = null; dock.setPlaying(false); draw() },
-    onPlayingChange: (p) => { dock.setPlaying(p); if (p) scene.globe.controls().autoRotate = false; else { activeLegId = null; chase = null; dart.stop(); beacon.halt() } draw() },
+    onDone: () => { activeLegId = null; dock.setPlaying(false); draw() },
+    onPlayingChange: (p) => { dock.setPlaying(p); if (p) scene.globe.controls().autoRotate = false; else { activeLegId = null; dart.stop(); beacon.halt() } draw() },
   })
 
   // Golden-hour callouts: fire when the replayed flight crosses the terminator. Thanks to
@@ -335,11 +316,6 @@ async function run() {
 
   dock.onPlayToggle(() => playback.toggle())
   dock.onSpeed((mult) => playback.setSpeed(mult))
-  dock.onFollow((on) => {
-    follow = on
-    if (!on) chase = null
-    else if (playback.isPlaying() && lastFly) chase = lastFly // hop onto the leg already flying
-  })
   dock.onSeek((ms) => {
     playhead = ms
     playback.pause()
