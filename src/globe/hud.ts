@@ -16,6 +16,7 @@ export interface Hud {
   setStats(s: Stats): void
   setMoment(location: string, dateTime: string): void
   setCityStats(data: CityStatsData | null): void
+  setEvent(text: string): void
   onCenterTap(cb: () => void): void
   onLunarToggle(cb: () => void): void
   setLunarActive(active: boolean): void
@@ -40,6 +41,7 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
 
   const cityChip = q<HTMLDivElement>('#cityChip')
   q('#cClose').addEventListener('click', () => { cityChip.style.display = 'none' })
+  let evTimer = 0
 
   return {
     root: host,
@@ -63,6 +65,13 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
       q('#cLandings').textContent = String(data.landings)
       q('#cLayover').textContent = fmtLayover(data.layoverMs)
       cityChip.style.display = 'block'
+    },
+    setEvent(text) {
+      const el = q<HTMLElement>('#eventChip')
+      el.textContent = text
+      el.classList.add('show')
+      clearTimeout(evTimer)
+      evTimer = window.setTimeout(() => el.classList.remove('show'), 3000)
     },
     onCenterTap(cb) { moment.addEventListener('click', cb) },
     onLunarToggle(cb) { q('#lunarBtn').addEventListener('click', cb) },
@@ -113,6 +122,8 @@ const HUD_HTML = `
     </div>
   </div>
 </div>
+
+<div id="eventChip"></div>
 
 <div id="tip">DRAG TO SPIN · SCROLL TO ZOOM · MOVE MOUSE FOR PARALLAX</div>
 `

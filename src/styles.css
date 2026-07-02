@@ -143,3 +143,10 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
   /* FROM / TO are read-only labels, not buttons — stop them looking tappable */
   .tlpill { border: none; background: none; padding: 2px 0; }
 }
+
+/* FOLLOW THE DART: loading line + golden-hour event chip */
+#acquiring{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,Menlo,monospace;font-size:12px;letter-spacing:3px;color:#5fe0ff;text-shadow:0 0 12px rgba(95,224,255,.5);pointer-events:none}
+@media (prefers-reduced-motion: no-preference){.acq-cursor{animation:acqBlink 1s steps(1) infinite}}
+@keyframes acqBlink{50%{opacity:0}}
+#eventChip{position:fixed;top:72px;left:50%;transform:translate(-50%,-8px);font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:2.5px;color:#ffd27a;background:rgba(8,20,34,.8);border:1px solid rgba(255,177,95,.4);border-radius:999px;padding:8px 16px;opacity:0;transition:opacity .5s ease,transform .5s ease;pointer-events:none;text-shadow:0 0 10px rgba(255,177,95,.6)}
+#eventChip.show{opacity:1;transform:translate(-50%,0)}

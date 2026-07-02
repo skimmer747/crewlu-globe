@@ -20,6 +20,7 @@ import { createTimelineDock, SPEEDS } from './globe/timelineDock'
 import { createPlayback } from './globe/playback'
 import { createLunarTrajectory, buildTrajectoryPoints, lunarReturns, LUNAR_RETURN_NM } from './globe/lunarTrajectory'
 import { createContrail } from './globe/contrail'
+import { sunElevationDeg } from './astro/sun'
 
 const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
 const fmt = (ms: number) => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2,'0')} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
@@ -36,12 +37,13 @@ async function run() {
   const { data: sess } = await supabase.auth.getSession()
   const account = sess.session?.user?.email ?? 'Signed in'
 
-  app.innerHTML = '<div id="viewport" style="position:fixed;inset:0"><div id="globe" style="width:100%;height:100%"></div></div><div id="hud" style="position:fixed;inset:0;pointer-events:none"></div>'
+  app.innerHTML = '<div id="viewport" style="position:fixed;inset:0"><div id="globe" style="width:100%;height:100%"></div></div><div id="hud" style="position:fixed;inset:0;pointer-events:none"></div><div id="acquiring">ACQUIRING TELEMETRY <span class="acq-cursor">▌</span></div>'
   const viewport = app.querySelector<HTMLDivElement>('#viewport')!
   const host = app.querySelector<HTMLDivElement>('#globe')!
   const hudHost = app.querySelector<HTMLDivElement>('#hud')!
 
   const [airports, flights] = await Promise.all([loadAirports(), fetchFlights(supabase)])
+  app.querySelector('#acquiring')?.remove()
   const { legs, dropped } = flightsToLegs(flights, airports)
   if (dropped) console.warn(`${dropped} legs dropped (unresolved airports or undated rows)`)
   const airportStats = computeAirportStats(legs)
@@ -261,10 +263,30 @@ async function run() {
       if (follow) chase = { leg, t0: performance.now(), dur } // ride along behind the dart
       else scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, dur)
     },
-    onPlayhead: (ms) => { playhead = ms; dock.setPlayhead(ms); draw(false) },
+    onPlayhead: (ms) => { playhead = ms; dock.setPlayhead(ms); draw(false); checkGoldenHour(ms) },
     onDone: () => { activeLegId = null; chase = null; dock.setPlaying(false); draw() },
     onPlayingChange: (p) => { dock.setPlaying(p); if (p) scene.globe.controls().autoRotate = false; else { activeLegId = null; chase = null; dart.stop(); beacon.halt() } draw() },
   })
+
+  // Golden-hour callouts: fire when the replayed flight crosses the terminator. Thanks to
+  // actual OOOI times the crossing lands where (and when) it really happened. Sign flips are
+  // tracked per active leg so leg-boundary position jumps never fire a phantom sunrise.
+  let elevLegId: string | null = null
+  let prevElev = 0
+  let lastEventAt = 0
+  const hemi = (v: number, pos: string, neg: string) => `${Math.abs(Math.round(v))}°${v >= 0 ? pos : neg}`
+  const checkGoldenHour = (ms: number) => {
+    if (!activeLegId) { elevLegId = null; return }
+    const loc = positionAt(ms).latlng
+    const elev = sunElevationDeg(loc[0], loc[1], ms)
+    if (elevLegId !== activeLegId) { elevLegId = activeLegId; prevElev = elev; return }
+    const now = performance.now()
+    if (prevElev < 0 !== elev < 0 && now - lastEventAt > 1500) {
+      lastEventAt = now
+      hud.setEvent(`${elev >= 0 ? 'SUNRISE' : 'SUNSET'} · ${hemi(loc[0], 'N', 'S')} ${hemi(loc[1], 'E', 'W')}`)
+    }
+    prevElev = elev
+  }
 
   dock.onPlayToggle(() => playback.toggle())
   dock.onSpeed((mult) => playback.setSpeed(mult))
@@ -310,7 +332,30 @@ async function run() {
   })
 
   dock.mount(hudHost)
-  draw() // initial paint, paused
+
+  // Cold-open: the career draws itself on — arcs dash in chronologically while the camera
+  // dives from high orbit to the beacon. Reduced-motion (or a trivial history) skips straight
+  // to the normal first paint.
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const introSolid = splitAtPlayhead(legsInWindow(legs, { start: win.start, end: win.end }), playhead).solid
+  if (reduceMotion || introSolid.length < 2) {
+    draw() // initial paint, paused
+  } else {
+    scene.globe.controls().autoRotate = false
+    scene.globe.pointOfView({ lat: beacon.pos.lat, lng: beacon.pos.lng, altitude: 4.5 }, 0)
+    scene.globe
+      .arcDashLength(1).arcDashGap(2)
+      .arcDashInitialGap((d: any) => 1 + (d.__order ?? 0) * 0.12)
+      .arcDashAnimateTime(2200)
+      .arcsData(introSolid.map((l, i) => ({ ...l, __order: i })))
+    scene.setSun(new Date(playhead))
+    scene.globe.pointOfView({ lat: beacon.pos.lat, lng: beacon.pos.lng, altitude: 1.7 }, 2600)
+    setTimeout(() => {
+      configureArcs(scene.globe) // restore the normal arc recipe
+      scene.globe.controls().autoRotate = true
+      draw()
+    }, 2800)
+  }
 }
 
 run().catch((e) => {
