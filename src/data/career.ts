@@ -17,19 +17,22 @@ export interface CareerRecords {
 export function recordsFor(legs: Leg[]): CareerRecords {
   const flown = legs.filter((l) => !l.dh)
   if (!flown.length) return { longest: null, shortest: null, topPair: null, topAirport: null, distinctTails: 0 }
-  let longest = flown[0], shortest = flown[0]
+  let longest: Leg | null = null, shortest: Leg | null = null
   const pairs = new Map<string, { a: string; b: string; count: number; legIds: string[] }>()
   const landings = new Map<string, number>()
   const tails = new Set<string>()
   for (const l of flown) {
-    if (l.miles > longest.miles) longest = l
-    if (l.miles < shortest.miles) shortest = l
+    if (l.from !== l.to) { // same-airport legs have no meaningful great-circle distance
+      if (!longest || l.miles > longest.miles) longest = l
+      if (!shortest || l.miles < shortest.miles) shortest = l
+    }
     const [a, b] = [l.from, l.to].sort()
     const key = `${a}-${b}`
     const p = pairs.get(key) ?? { a, b, count: 0, legIds: [] }
     p.count++; p.legIds.push(l.id)
     pairs.set(key, p)
-    landings.set(l.to, (landings.get(l.to) ?? 0) + 1)
+    // "base at the time": landing at the trip's own base doesn't count toward MOST LANDINGS
+    if (l.base == null || l.to !== l.base) landings.set(l.to, (landings.get(l.to) ?? 0) + 1)
     if (l.tail) tails.add(l.tail.trim().toUpperCase())
   }
   let topPair = null as CareerRecords['topPair']

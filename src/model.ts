@@ -48,6 +48,7 @@ export interface Leg {
   aircraft: string | null
   tail: string | null
   tripId: string | null
+  base?: string | null // normalized 3-char base of the leg's trip at the time (null/absent = unknown)
 }
 
 export interface Stats { miles: number; airports: number; countries: number; hours: number; flewMiles: number; rodeMiles: number; onTimePct: number | null }

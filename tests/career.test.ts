@@ -10,7 +10,7 @@ const leg = (o: Partial<Leg>): Leg => {
   return {
     id: `L${seq}`, from: 'SDF', to: 'ANC', s: [38, -85], e: [61, -150],
     t, takeoff: t + 600000, landing: (o.landing ?? t + 4 * 3600000), out: t, in: (o.landing ?? t + 4 * 3600000),
-    blockMs: 4 * 3600000, sched: NIL, act: NIL, dh: false, miles: 1000, aircraft: '74Y', tail: 'N601UP', tripId: null, ...o,
+    blockMs: 4 * 3600000, sched: NIL, act: NIL, dh: false, miles: 1000, aircraft: '74Y', tail: 'N601UP', tripId: null, base: null, ...o,
   }
 }
 
@@ -35,6 +35,55 @@ describe('recordsFor', () => {
     const r = recordsFor([])
     expect(r.longest).toBe(null)
     expect(r.topPair).toBe(null)
+  })
+})
+
+describe('recordsFor — same-airport and base-at-the-time rules', () => {
+  it('a same-airport leg cannot hold a distance record', () => {
+    seq = 0
+    const legs = [
+      leg({ miles: 0, from: 'SDF', to: 'SDF' }), // air return — must not win shortest
+      leg({ miles: 250, from: 'SDF', to: 'ORD' }),
+      leg({ miles: 4400, from: 'ANC', to: 'HKG' }),
+    ]
+    const r = recordsFor(legs)
+    expect(r.shortest!.miles).toBe(250)
+    expect(r.longest!.miles).toBe(4400)
+  })
+  it('all legs same-airport -> both distance records are null, rest still computed', () => {
+    seq = 0
+    const legs = [leg({ miles: 0, from: 'SDF', to: 'SDF' }), leg({ miles: 1, from: 'ANC', to: 'ANC' })]
+    const r = recordsFor(legs)
+    expect(r.shortest).toBe(null)
+    expect(r.longest).toBe(null)
+    expect(r.topPair).not.toBe(null)
+    expect(r.distinctTails).toBe(1)
+  })
+  it('landings at the trip\'s own base are excluded ("base at the time")', () => {
+    seq = 0
+    const legs = [
+      // ANC era: SDF was an outstation, so these SDF landings count
+      leg({ from: 'ANC', to: 'SDF', base: 'ANC' }),
+      leg({ from: 'ANC', to: 'SDF', base: 'ANC' }),
+      // SDF era: landings back at base do not count
+      leg({ from: 'ORD', to: 'SDF', base: 'SDF' }),
+      leg({ from: 'SDF', to: 'ORD', base: 'SDF' }),
+      leg({ from: 'SDF', to: 'ORD', base: 'SDF' }),
+      leg({ from: 'SDF', to: 'ORD', base: 'SDF' }),
+    ]
+    // raw landings: SDF 3, ORD 3 — but one SDF landing is at-base, so ORD 3 beats SDF 2
+    const r = recordsFor(legs)
+    expect(r.topAirport).toMatchObject({ iata: 'ORD', landings: 3 })
+  })
+  it('legs with unknown base count landings normally', () => {
+    seq = 0
+    const legs = [
+      leg({ from: 'ORD', to: 'SDF', base: null }),
+      leg({ from: 'ORD', to: 'SDF', base: undefined }),
+      leg({ from: 'SDF', to: 'ORD', base: 'SDF' }),
+    ]
+    const r = recordsFor(legs)
+    expect(r.topAirport).toMatchObject({ iata: 'SDF', landings: 2 })
   })
 })
 
