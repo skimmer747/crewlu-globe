@@ -17,6 +17,7 @@ function renderSignIn(root: HTMLElement, done: () => void) {
         <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
         <button id="signin">Sign in</button>
         <div id="err" class="auth-err"></div>
+        <a class="link" href="?demo=1" style="display:block;margin-top:14px;font-size:11px;letter-spacing:1px">VIEW A DEMO GLOBE →</a>
       </div>
     </div>`
   const $ = (id: string) => root.querySelector<HTMLInputElement>('#' + id)!

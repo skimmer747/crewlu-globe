@@ -26,7 +26,8 @@ export function createGlobeScene(host: HTMLElement, viewport: HTMLElement): Glob
     fragmentShader: dayNightFragment,
   })
 
-  const globe = (Globe as any)()(host)
+  // preserveDrawingBuffer lets the share card read the frame back out of the canvas.
+  const globe = (Globe as any)({ rendererConfig: { preserveDrawingBuffer: true } })(host)
     .backgroundColor('rgba(0,0,0,0)')
     .globeMaterial(material)
     .showAtmosphere(true).atmosphereColor('#6db6ff').atmosphereAltitude(0.2)

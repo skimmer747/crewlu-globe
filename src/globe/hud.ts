@@ -17,6 +17,7 @@ export interface Hud {
   setMoment(location: string, dateTime: string): void
   setCityStats(data: CityStatsData | null): void
   setEvent(text: string): void
+  onShare(cb: () => void): void
   onCenterTap(cb: () => void): void
   onLunarToggle(cb: () => void): void
   setLunarActive(active: boolean): void
@@ -73,6 +74,7 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
       clearTimeout(evTimer)
       evTimer = window.setTimeout(() => el.classList.remove('show'), 3000)
     },
+    onShare(cb) { q('#shareBtn').addEventListener('click', cb) },
     onCenterTap(cb) { moment.addEventListener('click', cb) },
     onLunarToggle(cb) { q('#lunarBtn').addEventListener('click', cb) },
     setLunarActive(active) { q('#lunarBtn').classList.toggle('on', active); q<HTMLElement>('#lunarReadout').style.display = active ? 'block' : 'none' },
@@ -97,6 +99,7 @@ const HUD_HTML = `
 
 <div id="lunar" class="hud" style="top:74px;left:52px;pointer-events:auto">
   <button id="lunarBtn" class="navbtn">◓ LUNAR RETURN</button>
+  <button id="shareBtn" class="navbtn" style="margin-left:8px">⇪ SHARE</button>
   <div id="lunarReadout" class="lunartel" style="display:none"></div>
 </div>
 

@@ -21,6 +21,9 @@ import { createPlayback } from './globe/playback'
 import { createLunarTrajectory, buildTrajectoryPoints, lunarReturns, LUNAR_RETURN_NM } from './globe/lunarTrajectory'
 import { createContrail } from './globe/contrail'
 import { sunElevationDeg } from './astro/sun'
+import { demoFlights } from './data/demoFlights'
+import { parseDeepLink } from './globe/deeplink'
+import { composeShareCard } from './globe/shareCard'
 
 const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
 const fmt = (ms: number) => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2,'0')} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
@@ -31,18 +34,23 @@ const MOON_EARTH_RATIO = 0.2 // Moon's on-screen size as a fraction of Earth's a
 const app = document.querySelector<HTMLDivElement>('#app')!
 
 async function run() {
-  await requireSession(app)
-
-  // FIX 5: get the signed-in email for the account chip
-  const { data: sess } = await supabase.auth.getSession()
-  const account = sess.session?.user?.email ?? 'Signed in'
+  // Jumpseat Mode: ?demo=1 rides a synthetic UPS line through the real pipeline —
+  // no account, no Supabase calls. Everything downstream is identical.
+  const demo = new URLSearchParams(location.search).get('demo') === '1'
+  let account = 'DEMO · GET CREWLU'
+  if (!demo) {
+    await requireSession(app)
+    // FIX 5: get the signed-in email for the account chip
+    const { data: sess } = await supabase.auth.getSession()
+    account = sess.session?.user?.email ?? 'Signed in'
+  }
 
   app.innerHTML = '<div id="viewport" style="position:fixed;inset:0"><div id="globe" style="width:100%;height:100%"></div></div><div id="hud" style="position:fixed;inset:0;pointer-events:none"></div><div id="acquiring">ACQUIRING TELEMETRY <span class="acq-cursor">▌</span></div>'
   const viewport = app.querySelector<HTMLDivElement>('#viewport')!
   const host = app.querySelector<HTMLDivElement>('#globe')!
   const hudHost = app.querySelector<HTMLDivElement>('#hud')!
 
-  const [airports, flights] = await Promise.all([loadAirports(), fetchFlights(supabase)])
+  const [airports, flights] = await Promise.all([loadAirports(), demo ? Promise.resolve(demoFlights()) : fetchFlights(supabase)])
   app.querySelector('#acquiring')?.remove()
   const { legs, dropped } = flightsToLegs(flights, airports)
   if (dropped) console.warn(`${dropped} legs dropped (unresolved airports or undated rows)`)
@@ -78,9 +86,12 @@ async function run() {
   dart.attach(scene.globe)
 
   // FIX 5: pass real account email and sign-out handler to the HUD chip
+  // (in demo mode the chip is a call-to-action that opens crewlu.net instead)
   const hud = createHud(hudHost, {
     account,
-    onSignOut: async () => { await supabase.auth.signOut(); location.reload() },
+    onSignOut: demo
+      ? () => { window.open('https://crewlu.net', '_blank', 'noopener') }
+      : async () => { await supabase.auth.signOut(); location.reload() },
   })
   // Occlude DOM sky bodies (Moon, Sun, planets) behind the Earth as the camera moves:
   // big bodies get the limb-clip; tiny ones (planets) just hide when behind.
@@ -159,6 +170,16 @@ async function run() {
   win.end = Math.max(win.end, lastLeg.landing)
   let playhead = Math.min(Math.max(now, win.start), win.end)
 
+  // Deep link (#trip=<id>&play=1): snap the window to that trip and cue the playhead.
+  const link = parseDeepLink(location.hash)
+  const linkedTrip = link.trip ? trips.find((t) => t.id === link.trip) : undefined
+  if (linkedTrip) {
+    const lastTripLeg = linkedTrip.legs[linkedTrip.legs.length - 1]
+    win.start = linkedTrip.start - 12 * 3600 * 1000
+    win.end = lastTripLeg.landing + 12 * 3600 * 1000
+    playhead = linkedTrip.start
+  }
+
   // Where the pilot is at an instant, OOOI-phased: taxi-out (out -> off), airborne
   // (off -> on), taxi-in (on -> in), or parked at the last arrival.
   const positionAt = (t: number): { latlng: [number, number]; label: string } => {
@@ -180,6 +201,7 @@ async function run() {
   let lastSolidCount = -1
   let lastActiveId: string | null = null
   let currentMiles = 0
+  let lastStats: ReturnType<typeof statsFor> | null = null
   let lunarOn = false, revealRaf = 0
   // Rebuild the lunar line + readout from the current miles & Moon position (called on toggle and on every timeline change).
   const refreshLunar = (animate: boolean) => {
@@ -201,7 +223,7 @@ async function run() {
     const { solid, ghost } = splitAtPlayhead(inWin, playhead)
     if (full || solid.length !== lastSolidCount || activeLegId !== lastActiveId) {
       setArcs(scene.globe, solid, ghost, activeLegId)
-      const stats = statsFor(solid, meta); hud.setStats(stats); currentMiles = stats.flewMiles
+      const stats = statsFor(solid, meta); hud.setStats(stats); currentMiles = stats.flewMiles; lastStats = stats
       lastSolidCount = solid.length
       lastActiveId = activeLegId
     }
@@ -288,6 +310,31 @@ async function run() {
     prevElev = elev
   }
 
+  // Share: composite the live frame + stats into a 1200x630 card and hand it to the OS
+  // share sheet (download fallback). preserveDrawingBuffer makes the canvas readable.
+  hud.onShare(() => {
+    if (!lastStats) return
+    const glCanvas = host.querySelector('canvas')
+    if (!glCanvas) return
+    const laps = lunarReturns(currentMiles)
+    const card = composeShareCard(glCanvas as HTMLCanvasElement, lastStats,
+      `${Math.round(currentMiles).toLocaleString()} NM FLOWN · ${laps.toFixed(2)} LUNAR RETURNS`)
+    card.toBlob(async (blob) => {
+      if (!blob) return
+      const file = new File([blob], 'crewlu-globe.jpg', { type: 'image/jpeg' })
+      const nav: any = navigator
+      if (nav.share && nav.canShare?.({ files: [file] })) {
+        try { await nav.share({ files: [file], title: 'My CrewLu Flight Globe' }) } catch { /* user dismissed */ }
+      } else {
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = 'crewlu-globe.jpg'
+        a.click()
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+      }
+    }, 'image/jpeg', 0.9)
+  })
+
   dock.onPlayToggle(() => playback.toggle())
   dock.onSpeed((mult) => playback.setSpeed(mult))
   dock.onFollow((on) => { follow = on; if (!on) chase = null })
@@ -338,7 +385,11 @@ async function run() {
   // to the normal first paint.
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const introSolid = splitAtPlayhead(legsInWindow(legs, { start: win.start, end: win.end }), playhead).solid
-  if (reduceMotion || introSolid.length < 2) {
+  if (linkedTrip && link.play) {
+    // Deep-linked auto-play: skip the cold-open, fly the trip.
+    draw()
+    playback.play()
+  } else if (reduceMotion || introSolid.length < 2) {
     draw() // initial paint, paused
   } else {
     scene.globe.controls().autoRotate = false
