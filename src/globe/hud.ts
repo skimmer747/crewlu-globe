@@ -17,6 +17,15 @@ export interface Hud {
   setMoment(location: string, dateTime: string): void
   setCityStats(data: CityStatsData | null): void
   setEvent(text: string): void
+  setConversions(text: string): void
+  setPanel(html: string | null): void
+  setAllTimeActive(on: boolean): void
+  setRecordsActive(on: boolean): void
+  setFleetActive(on: boolean): void
+  onAllTime(cb: () => void): void
+  onRecords(cb: () => void): void
+  onFleet(cb: () => void): void
+  onPanelSpot(cb: (el: HTMLElement) => void): void
   onShare(cb: () => void): void
   onCenterTap(cb: () => void): void
   onLunarToggle(cb: () => void): void
@@ -67,6 +76,24 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
       q('#cLayover').textContent = fmtLayover(data.layoverMs)
       cityChip.style.display = 'block'
     },
+    setConversions(text) { q('#sConvert').textContent = text },
+    setPanel(html) {
+      const p = q<HTMLElement>('#wrapPanel')
+      if (!html) { p.style.display = 'none'; p.innerHTML = '' }
+      else { p.innerHTML = html; p.style.display = 'block' }
+    },
+    setAllTimeActive(on) { q('#allTimeBtn').classList.toggle('on', on) },
+    setRecordsActive(on) { q('#recordsBtn').classList.toggle('on', on) },
+    setFleetActive(on) { q('#fleetBtn').classList.toggle('on', on) },
+    onAllTime(cb) { q('#allTimeBtn').addEventListener('click', cb) },
+    onRecords(cb) { q('#recordsBtn').addEventListener('click', cb) },
+    onFleet(cb) { q('#fleetBtn').addEventListener('click', cb) },
+    onPanelSpot(cb) {
+      q('#wrapPanel').addEventListener('click', (e) => {
+        const el = (e.target as HTMLElement).closest('[data-spot]') as HTMLElement | null
+        if (el) cb(el)
+      })
+    },
     setEvent(text) {
       const el = q<HTMLElement>('#eventChip')
       el.textContent = text
@@ -100,11 +127,17 @@ const HUD_HTML = `
 <div id="lunar" class="hud" style="top:74px;left:52px;pointer-events:auto">
   <button id="lunarBtn" class="navbtn">◓ LUNAR RETURN</button>
   <button id="shareBtn" class="navbtn" style="margin-left:8px">⇪ SHARE</button>
+  <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+    <button id="allTimeBtn" class="navbtn">★ ALL TIME</button>
+    <button id="recordsBtn" class="navbtn">⛁ RECORDS</button>
+    <button id="fleetBtn" class="navbtn">✈ FLEET</button>
+  </div>
   <div id="lunarReadout" class="lunartel" style="display:none"></div>
+  <div id="wrapPanel" class="lunartel" style="display:none;pointer-events:auto"></div>
 </div>
 
 <div id="rail">
-  <div class="chip" style="text-align:right"><div class="sv" id="sMiles">—</div><div class="sl">NAUTICAL MILES</div><div class="sl" id="sMilesSub" style="margin-top:3px"></div></div>
+  <div class="chip" style="text-align:right"><div class="sv" id="sMiles">—</div><div class="sl">NAUTICAL MILES</div><div class="sl" id="sMilesSub" style="margin-top:3px"></div><div class="sl" id="sConvert" style="margin-top:3px;color:#ffd778"></div></div>
   <div class="chip" style="text-align:right"><div class="sv" id="sApts">—</div><div class="sl">AIRPORTS</div></div>
   <div class="chip" style="text-align:right"><div class="sv" id="sCountries">—</div><div class="sl">COUNTRIES</div></div>
   <div class="chip" style="text-align:right"><div class="sv" id="sHours">—</div><div class="sl">BLOCK HOURS</div><div class="sl" id="sOnTime" style="margin-top:3px"></div></div>
