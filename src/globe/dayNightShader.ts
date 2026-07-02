@@ -18,10 +18,21 @@ export const dayNightFragment = /* glsl */`
     mat3 rotX = mat3(1.0,0.0,0.0, 0.0,cos(invLat),-sin(invLat), 0.0,sin(invLat),cos(invLat));
     mat3 rotY = mat3(cos(invLon),0.0,sin(invLon), 0.0,1.0,0.0, -sin(invLon),0.0,cos(invLon));
     vec3 sunDir = rotX * rotY * polar2cart(sunPosition);
-    float intensity = dot(normalize(vNormal), normalize(sunDir));
+    vec3 n = normalize(vNormal);
+    vec3 sd = normalize(sunDir);
+    float intensity = dot(n, sd);
     vec4 day = texture2D(dayTexture, vUv);
     vec4 night = texture2D(nightTexture, vUv);
     float f = smoothstep(-0.12, 0.12, intensity);
-    gl_FragColor = vec4(mix(night.rgb * vec3(1.05,1.0,0.85), day.rgb, f), 1.0);
+    // Dusk ignition: city lights flare along the terminator, so towns visibly switch on
+    // as the shadow line sweeps across them (and feed the bloom pass).
+    float dusk = smoothstep(0.25, 0.0, abs(intensity));
+    vec3 nightLit = night.rgb * vec3(1.05, 1.0, 0.85) * (1.0 + 1.6 * dusk);
+    // Ocean glint: a water-masked specular highlight on the day side (view axis ~ +Z in view space).
+    float sea = smoothstep(0.02, 0.12, day.b - day.r);
+    vec3 h = normalize(sd + vec3(0.0, 0.0, 1.0));
+    float spec = pow(max(dot(n, h), 0.0), 60.0) * sea * f;
+    vec3 color = mix(nightLit, day.rgb, f) + vec3(0.5, 0.7, 0.9) * spec * 0.35;
+    gl_FragColor = vec4(color, 1.0);
   }
 `

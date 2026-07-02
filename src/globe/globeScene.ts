@@ -1,5 +1,6 @@
 import Globe from 'globe.gl'
 import * as THREE from 'three'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { dayNightVertex, dayNightFragment } from './dayNightShader'
 import { subsolarPoint } from '../astro/sun'
 
@@ -12,10 +13,12 @@ export interface GlobeScene {
 
 export function createGlobeScene(host: HTMLElement, viewport: HTMLElement): GlobeScene {
   const loader = new THREE.TextureLoader()
+  const dayTex = loader.load('/textures/earth-day.jpg')
+  const nightTex = loader.load('/textures/earth-night.jpg')
   const material = new THREE.ShaderMaterial({
     uniforms: {
-      dayTexture: { value: loader.load('/textures/earth-day.jpg') },
-      nightTexture: { value: loader.load('/textures/earth-night.jpg') },
+      dayTexture: { value: dayTex },
+      nightTexture: { value: nightTex },
       sunPosition: { value: new THREE.Vector2() },
       globeRotation: { value: new THREE.Vector2() },
     },
@@ -28,7 +31,21 @@ export function createGlobeScene(host: HTMLElement, viewport: HTMLElement): Glob
     .globeMaterial(material)
     .showAtmosphere(true).atmosphereColor('#6db6ff').atmosphereAltitude(0.2)
 
-  const size = () => globe.width(host.clientWidth).height(host.clientHeight)
+  // Free sharpness at close zoom: max anisotropic filtering on both Earth textures.
+  const maxAniso = globe.renderer().capabilities.getMaxAnisotropy()
+  dayTex.anisotropy = maxAniso
+  nightTex.anisotropy = maxAniso
+
+  // Real bloom: only pixels above the threshold glow — the cyan arcs, the dart's additive
+  // cones, and terminator-boosted city lights. The day-side Earth stays below threshold.
+  const bloom = new UnrealBloomPass(
+    new THREE.Vector2(host.clientWidth || 800, host.clientHeight || 600), 0.7, 0.4, 0.55)
+  globe.postProcessingComposer().addPass(bloom)
+
+  const size = () => {
+    globe.width(host.clientWidth).height(host.clientHeight)
+    bloom.setSize(host.clientWidth || 800, host.clientHeight || 600)
+  }
   size(); window.addEventListener('resize', size)
   globe.pointOfView({ lat: 25, lng: -40, altitude: 2.4 }, 0)
 
