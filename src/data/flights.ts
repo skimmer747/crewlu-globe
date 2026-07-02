@@ -21,3 +21,28 @@ export async function fetchFlights(client: SupabaseClient): Promise<FlightRow[]>
   }
   return all
 }
+
+/** Normalized 3-char base code ('SDFZ' -> 'SDF'); null for empty/absent values. */
+export function normalizeBase(v: string | null | undefined): string | null {
+  const s = (v ?? '').trim().toUpperCase()
+  return s ? s.slice(0, 3) : null
+}
+
+/** tripId -> base-at-the-time, for the MOST LANDINGS exclusion. Paginated like fetchFlights. */
+export async function fetchTripBases(client: SupabaseClient): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  const PAGE = 1000
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await client
+      .from('trips')
+      .select('id,base')
+      .is('deleted_at', null)
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error) throw error
+    const rows = (data ?? []) as { id: string; base: string | null }[]
+    for (const r of rows) { const b = normalizeBase(r.base); if (b) map.set(r.id, b) }
+    if (rows.length < PAGE) break
+  }
+  return map
+}
