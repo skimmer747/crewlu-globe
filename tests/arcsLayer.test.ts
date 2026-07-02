@@ -45,4 +45,25 @@ describe('arcsLayer helpers', () => {
     expect((out[0] as any).__ghost).toBeFalsy()
     expect((out[1] as any).__ghost).toBe(true)
   })
+  it('spotlight golds the spotted legs and dims the rest of the solids', () => {
+    const out = combineArcData(
+      [leg({ id: 'a' }), leg({ id: 'b' })], [leg({ id: 'g' })], null,
+      { spotIds: new Set(['a']) })
+    const a = out.find(l => l.id === 'a')! as any
+    const b = out.find(l => l.id === 'b')! as any
+    expect(arcPaint(a)[1]).toBe('#ffd778')
+    expect(arcPaint(b)[0]).toContain('rgba') // dimmed
+    expect(arcPaint(out.find(l => l.id === 'g') as any)[0]).toContain('0.18') // ghost unchanged
+  })
+  it('fleet mode paints solids by type rank; unranked types go neutral', () => {
+    const rank = new Map([['74Y', 0], ['M1F', 1]])
+    const out = combineArcData(
+      [leg({ id: 'a', aircraft: '74Y' }), leg({ id: 'b', aircraft: 'M1F' }), leg({ id: 'c', aircraft: '???' })],
+      [], null, { fleetRank: rank })
+    const [pa] = arcPaint(out[0] as any)
+    const [pb] = arcPaint(out[1] as any)
+    const [pc] = arcPaint(out[2] as any)
+    expect(pa).not.toBe(pb)
+    expect(pc).toBe('#9fb3c4') // unranked -> neutral
+  })
 })
