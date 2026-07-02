@@ -10,7 +10,7 @@
 
 ## Rules
 
-1. A leg with `from === to` cannot hold the SHORTEST LEG record. It still counts everywhere else (hours, milestones, most-flown pair, landings) — the flying was real; it just has no meaningful great-circle distance. LONGEST is unaffected by construction.
+1. A leg with `from === to` cannot hold either distance record (SHORTEST or LONGEST LEG — it has no meaningful great-circle distance; in practice only shortest changes, since ~0 NM can never win longest against any real leg). It still counts everywhere else: hours, milestones, most-flown pair, landings.
 2. A landing does not count toward MOST LANDINGS when it occurred at **the base of the trip it belongs to** ("base at the time"). Landings at a *future or former* domicile count normally — an ANC-era landing at SDF was an outstation landing. Legs whose trip base is unknown count normally.
 
 ## Data plumbing
