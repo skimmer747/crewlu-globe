@@ -58,6 +58,7 @@ export function flightsToLegs(rows: FlightRow[], airports: AirportIndex): { legs
       dh: Boolean(r.is_dh || r.is_commercial_deadhead),
       miles,
       aircraft: r.aircraft_type,
+      tail: r.tail_number,
       tripId: r.trip_id,
     })
   }

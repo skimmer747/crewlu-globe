@@ -3,7 +3,7 @@ import { buildPlaybackSchedule, playheadForSample } from '../src/globe/playback'
 import type { Leg } from '../src/model'
 
 const leg = (id: string, t: number, tripId: string | null): Leg =>
-  ({ id, from: 'A', to: 'B', s: [0, 0], e: [1, 1], t, takeoff: t, landing: t, out: t, in: t, blockMs: 0, sched: { out: null, off: null, on: null, in: null }, act: { out: null, off: null, on: null, in: null }, dh: false, miles: 1, aircraft: null, tripId })
+  ({ id, from: 'A', to: 'B', s: [0, 0], e: [1, 1], t, takeoff: t, landing: t, out: t, in: t, blockMs: 0, sched: { out: null, off: null, on: null, in: null }, act: { out: null, off: null, on: null, in: null }, dh: false, miles: 1, aircraft: null, tail: null, tripId })
 
 describe('buildPlaybackSchedule', () => {
   // 3 legs: two in trip T1, one in trip T2 -> one dwell after leg index 1

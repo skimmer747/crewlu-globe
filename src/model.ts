@@ -46,6 +46,7 @@ export interface Leg {
   dh: boolean       // true => deadhead (rode), false => flew (operated)
   miles: number
   aircraft: string | null
+  tail: string | null
   tripId: string | null
 }
 
