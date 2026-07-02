@@ -23,6 +23,7 @@ import { createContrail } from './globe/contrail'
 import { sunElevationDeg } from './astro/sun'
 import { demoFlights } from './data/demoFlights'
 import { parseDeepLink } from './globe/deeplink'
+import { recordsFor, milestonesFor, fleetStats, EARTH_LAP_NM } from './data/career'
 import { composeShareCard } from './globe/shareCard'
 
 const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
@@ -198,6 +199,8 @@ async function run() {
   // Arc rebuilds are gated on the solid-count OR the active (in-flight) leg changing.
   // The cheap per-frame updates always run.
   let activeLegId: string | null = null
+  let spotIds: Set<string> | null = null
+  let fleetOn = false
   let lastSolidCount = -1
   let lastActiveId: string | null = null
   let currentMiles = 0
@@ -222,7 +225,7 @@ async function run() {
     const inWin = legsInWindow(legs, { start: win.start, end: win.end })
     const { solid, ghost } = splitAtPlayhead(inWin, playhead)
     if (full || solid.length !== lastSolidCount || activeLegId !== lastActiveId) {
-      setArcs(scene.globe, solid, ghost, activeLegId)
+      setArcs(scene.globe, solid, ghost, activeLegId, { spotIds: spotIds ?? undefined, fleetRank: fleetOn ? fleetRank : undefined })
       const stats = statsFor(solid, meta); hud.setStats(stats); currentMiles = stats.flewMiles; lastStats = stats
       lastSolidCount = solid.length
       lastActiveId = activeLegId
@@ -243,7 +246,11 @@ async function run() {
   const home = beaconHome(legs, now)
   if (home) beacon.setAt(home[0], home[1])
 
-  const dock = createTimelineDock({ legs, trips, windowStart: win.start, windowEnd: win.end, playhead, now })
+  // Wrapped career layer: records, milestone crossings, fleet breakdown (operated legs only).
+  const career = { records: recordsFor(legs), milestones: milestonesFor(legs), fleet: fleetStats(legs) }
+  const fleetRank = new Map(career.fleet.map((f, i) => [f.type, i]))
+
+  const dock = createTimelineDock({ legs, trips, windowStart: win.start, windowEnd: win.end, playhead, now, milestones: career.milestones })
 
   // Camera zoom tracks leg length: short hops zoom way in, long hauls pull out (lower altitude = closer).
   const altForLeg = (miles: number) => Math.min(2.6, Math.max(0.6, 0.6 + miles * 0.00033))
@@ -264,7 +271,7 @@ async function run() {
       // camera follows the plane to its arrival, zoomed to the leg's length
       scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, dur)
     },
-    onPlayhead: (ms) => { playhead = ms; dock.setPlayhead(ms); draw(false); checkGoldenHour(ms) },
+    onPlayhead: (ms) => { checkMilestones(playhead, ms); playhead = ms; dock.setPlayhead(ms); draw(false); checkGoldenHour(ms) },
     onDone: () => { activeLegId = null; dock.setPlaying(false); draw() },
     onPlayingChange: (p) => { dock.setPlaying(p); if (p) scene.globe.controls().autoRotate = false; else { activeLegId = null; dart.stop(); beacon.halt() } draw() },
   })
@@ -312,6 +319,130 @@ async function run() {
         setTimeout(() => URL.revokeObjectURL(a.href), 5000)
       }
     }, 'image/jpeg', 0.9)
+  })
+
+  // Milestone toasts: playhead sweeping past a career crossing fires the golden event chip.
+  const checkMilestones = (fromMs: number, toMs: number) => {
+    if (toMs <= fromMs) return
+    for (const m of career.milestones) {
+      if (m.t > fromMs && m.t <= toMs) { hud.setEvent(m.label); break }
+    }
+  }
+
+  // ALL TIME: whole-career view with an odometer roll-up and conversion lines.
+  let allTime = false
+  let savedView: { start: number; end: number; playhead: number; pov: any } | null = null
+  const runOdometer = (from: { miles: number; hours: number; airports: number; countries: number }) => {
+    const to = lastStats
+    if (!to) return
+    const t0 = performance.now()
+    const step = () => {
+      const k = Math.min(1, (performance.now() - t0) / 1600)
+      const e = 1 - Math.pow(1 - k, 3)
+      const mix = (a: number, b: number) => a + (b - a) * e
+      hud.setStats({
+        ...to,
+        miles: Math.round(mix(from.miles, to.miles)),
+        hours: Math.round(mix(from.hours, to.hours)),
+        airports: Math.round(mix(from.airports, to.airports)),
+        countries: Math.round(mix(from.countries, to.countries)),
+      })
+      if (k < 1) requestAnimationFrame(step)
+    }
+    requestAnimationFrame(step)
+  }
+  hud.onAllTime(() => {
+    allTime = !allTime
+    hud.setAllTimeActive(allTime)
+    if (allTime) {
+      playback.pause()
+      savedView = { start: win.start, end: win.end, playhead, pov: scene.globe.pointOfView() }
+      const before = lastStats ?? { miles: 0, hours: 0, airports: 0, countries: 0 }
+      win.start = legs[0].t - 12 * 3600 * 1000
+      win.end = legs[legs.length - 1].landing + 12 * 3600 * 1000
+      playhead = win.end
+      dock.setWindow(win.start, win.end)
+      dock.setPlayhead(playhead)
+      scene.globe.controls().autoRotate = true
+      scene.globe.pointOfView({ lat: 25, lng: scene.globe.pointOfView().lng, altitude: 2.8 }, 1400)
+      draw()
+      runOdometer(before)
+      const laps = currentMiles / EARTH_LAP_NM
+      hud.setConversions(`= ${laps.toFixed(1)}× AROUND EARTH · ${lunarReturns(currentMiles).toFixed(2)} LUNAR RETURNS`)
+    } else {
+      hud.setConversions('')
+      if (savedView) {
+        win.start = savedView.start; win.end = savedView.end; playhead = savedView.playhead
+        dock.setWindow(win.start, win.end)
+        dock.setPlayhead(playhead)
+        scene.globe.pointOfView(savedView.pov, 1200)
+      }
+      draw()
+    }
+  })
+
+  // RECORDS: superlatives panel; tapping a row spotlights the arc(s) in gold.
+  let recordsOn = false
+  const midOf = (l: (typeof legs)[number]) => slerp(l.s, l.e, 0.5)
+  const recRow = (label: string, value: string, ids: string[], mid: [number, number], miles: number) =>
+    `<div class="wrow" data-spot="${ids.join(',')}" data-lat="${mid[0].toFixed(2)}" data-lng="${mid[1].toFixed(2)}" data-alt="${altForLeg(miles).toFixed(2)}">${label}<br><b>${value}</b></div>`
+  const buildRecordsPanel = () => {
+    const r = career.records
+    const rows: string[] = []
+    if (r.longest) rows.push(recRow('LONGEST LEG', `${r.longest.from} → ${r.longest.to} · ${Math.round(r.longest.miles).toLocaleString()} NM`, [r.longest.id], midOf(r.longest), r.longest.miles))
+    if (r.shortest) rows.push(recRow('SHORTEST LEG', `${r.shortest.from} → ${r.shortest.to} · ${Math.round(r.shortest.miles).toLocaleString()} NM`, [r.shortest.id], midOf(r.shortest), r.shortest.miles))
+    if (r.topPair) {
+      const sample = legs.find((l) => l.id === r.topPair!.legIds[0])!
+      rows.push(recRow('TOP CITY PAIR', `${r.topPair.a} ⇄ ${r.topPair.b} · ${r.topPair.count}×`, r.topPair.legIds, midOf(sample), sample.miles))
+    }
+    if (r.topAirport) rows.push(`<div class="wrow">MOST LANDINGS<br><b>${r.topAirport.iata} · ${r.topAirport.landings}</b></div>`)
+    rows.push(`<div class="wrow">TAILS FLOWN<br><b>${r.distinctTails}</b></div>`)
+    return rows.join('')
+  }
+  hud.onRecords(() => {
+    recordsOn = !recordsOn
+    hud.setRecordsActive(recordsOn)
+    if (recordsOn) {
+      fleetOn = false; hud.setFleetActive(false)
+      hud.setPanel(buildRecordsPanel())
+    } else {
+      spotIds = null
+      hud.setPanel(null)
+    }
+    draw()
+  })
+  let lastSpotKey = ''
+  hud.onPanelSpot((el) => {
+    const ids = (el.dataset.spot ?? '').split(',').filter(Boolean)
+    if (!ids.length) return
+    const key = ids.join(',')
+    if (spotIds && key === lastSpotKey) { spotIds = null; lastSpotKey = ''; el.classList.remove('spotted') }
+    else {
+      spotIds = new Set(ids)
+      lastSpotKey = key
+      el.parentElement?.querySelectorAll('.wrow').forEach((n) => n.classList.remove('spotted'))
+      el.classList.add('spotted')
+      scene.globe.controls().autoRotate = false
+      scene.globe.pointOfView({ lat: +el.dataset.lat!, lng: +el.dataset.lng!, altitude: +el.dataset.alt! }, 1100)
+    }
+    draw()
+  })
+
+  // FLEET: recolor the map by aircraft type, with a ranked legend.
+  const FLEET_HUES = ['#5fe0ff', '#ffd778', '#c792ea', '#7ddc8f', '#ff9e9e']
+  hud.onFleet(() => {
+    fleetOn = !fleetOn
+    hud.setFleetActive(fleetOn)
+    if (fleetOn) {
+      recordsOn = false; spotIds = null
+      hud.setRecordsActive(false)
+      const legend = career.fleet.slice(0, 5).map((f, i) =>
+        `<div class="wrow"><span style="color:${FLEET_HUES[i]}">■</span> ${f.type}<br><b>${f.legs} LEGS · ${Math.round(f.blockMs / 3600000).toLocaleString()} HRS</b></div>`).join('')
+      hud.setPanel(legend)
+    } else {
+      hud.setPanel(null)
+    }
+    draw()
   })
 
   dock.onPlayToggle(() => playback.toggle())
