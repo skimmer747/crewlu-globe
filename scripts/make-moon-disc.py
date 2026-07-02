@@ -8,6 +8,7 @@ cached next to this script (cache is gitignored).
 
 Output: public/textures/moon-disc.webp, 1024x1024 RGBA.
 Usage:  python3 scripts/make-moon-disc.py
+Requires: Pillow (pip install Pillow)
 """
 import math, os, urllib.request
 from PIL import Image
@@ -22,8 +23,10 @@ def load_map():
     if not os.path.exists(CACHE):
         print('downloading', SRC_URL)
         req = urllib.request.Request(SRC_URL, headers={'User-Agent': 'crewlu-globe asset build'})
-        with urllib.request.urlopen(req) as r, open(CACHE, 'wb') as f:
+        tmp = CACHE + '.tmp'
+        with urllib.request.urlopen(req) as r, open(tmp, 'wb') as f:
             f.write(r.read())
+        os.replace(tmp, CACHE)
     return Image.open(CACHE).convert('RGB')
 
 def main():
