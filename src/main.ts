@@ -130,8 +130,9 @@ async function run() {
   const contrail = createContrail()
   let lastTrailWrite = 0
   let lastTrailN = 0
+  let tickChase: () => void = () => {} // assigned after playback wiring (needs altForLeg)
   const loop = () => {
-    beacon.tick(); dart.tick(); beacon.setVeil(dart.presence())
+    beacon.tick(); dart.tick(); beacon.setVeil(dart.presence()); tickChase()
     const nowMs = performance.now()
     const g = dart.geoPos()
     if (g) contrail.push(g[0], g[1], g[2], nowMs)
@@ -222,6 +223,28 @@ async function run() {
 
   // Camera zoom tracks leg length: short hops zoom way in, long hauls pull out (lower altitude = closer).
   const altForLeg = (miles: number) => Math.min(2.6, Math.max(0.6, 0.6 + miles * 0.00033))
+
+  // Chase cam: while a leg flies (and FOLLOW is on) the camera trails just behind the dart,
+  // swooping from a wide view at the runways down toward the surface at cruise. Camera-only —
+  // per-frame pointOfView with 0ms transitions; never touches the canvas (raycasting constraint).
+  let follow = true
+  let chase: { leg: (typeof legs)[number]; t0: number; dur: number } | null = null
+  const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
+  tickChase = () => {
+    if (!chase) return
+    const p = clamp01((performance.now() - chase.t0) / chase.dur)
+    const leg = chase.leg
+    if (p >= 1) {
+      chase = null
+      scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, 800)
+      return
+    }
+    const [lat, lng] = slerp(leg.s, leg.e, clamp01(p - 0.08)) // trail the dart by 8% of the leg
+    const cruise = altForLeg(leg.miles) * 0.55
+    const altitude = cruise + (1.2 - cruise) * (1 - Math.sin(Math.PI * p))
+    scene.globe.pointOfView({ lat, lng, altitude: Math.max(0.5, altitude) }, 0)
+  }
+
   const playback = createPlayback({
     legs: () => legsInWindow(legs, { start: win.start, end: win.end }),
     trips: () => trips,
@@ -235,16 +258,17 @@ async function run() {
       beacon.flyLeg(leg, dur)
       dart.flyLeg(leg, dur) // the 3D dart rides the same leg, in sync
 
-      // camera follows the plane to its arrival, zoomed to the leg's length
-      scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, dur)
+      if (follow) chase = { leg, t0: performance.now(), dur } // ride along behind the dart
+      else scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, dur)
     },
     onPlayhead: (ms) => { playhead = ms; dock.setPlayhead(ms); draw(false) },
-    onDone: () => { activeLegId = null; dock.setPlaying(false); draw() },
-    onPlayingChange: (p) => { dock.setPlaying(p); if (p) scene.globe.controls().autoRotate = false; else { activeLegId = null; dart.stop(); beacon.halt() } draw() },
+    onDone: () => { activeLegId = null; chase = null; dock.setPlaying(false); draw() },
+    onPlayingChange: (p) => { dock.setPlaying(p); if (p) scene.globe.controls().autoRotate = false; else { activeLegId = null; chase = null; dart.stop(); beacon.halt() } draw() },
   })
 
   dock.onPlayToggle(() => playback.toggle())
   dock.onSpeed((mult) => playback.setSpeed(mult))
+  dock.onFollow((on) => { follow = on; if (!on) chase = null })
   dock.onSeek((ms) => {
     playhead = ms
     playback.pause()

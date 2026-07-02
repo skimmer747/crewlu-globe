@@ -20,6 +20,8 @@ export interface TimelineDock {
   onSeek(cb: (ms: number) => void): void
   onPlayToggle(cb: () => void): void
   onSpeed(cb: (mult: number) => void): void
+  onFollow(cb: (on: boolean) => void): void
+  setFollow(on: boolean): void
 }
 
 // The window fills the central BAND of the track; the outer INSET strips are the "runway"
@@ -54,6 +56,8 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
   let cbSeek: (ms: number) => void = () => {}
   let cbToggle: () => void = () => {}
   let cbSpeed: (m: number) => void = () => {}
+  let cbFollow: (on: boolean) => void = () => {}
+  let followOn = true
 
   // content x (0..1, within the window) <-> track fraction (0..1, across the element)
   const cToT = (x: number) => INSET + x * BAND
@@ -284,6 +288,13 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
       })
       cbSpeed(SPEEDS[state.speedIndex]) // sync the playback's actual speed to the default
       h.querySelector('#tlPlay')!.addEventListener('click', () => cbToggle())
+      const followBtn = h.querySelector<HTMLElement>('#tlFollow')!
+      followBtn.classList.toggle('on', followOn)
+      followBtn.addEventListener('click', () => {
+        followOn = !followOn
+        followBtn.classList.toggle('on', followOn)
+        cbFollow(followOn)
+      })
       bindDrag()
       renderTrack()
     },
@@ -295,6 +306,8 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
     onSeek(cb) { cbSeek = cb },
     onPlayToggle(cb) { cbToggle = cb },
     onSpeed(cb) { cbSpeed = cb },
+    onFollow(cb) { cbFollow = cb },
+    setFollow(on) { followOn = on; host?.querySelector('#tlFollow')?.classList.toggle('on', on) },
   }
 }
 
@@ -304,6 +317,7 @@ const DOCK_HTML = `
     <div id="tlTrack"></div>
     <div id="tlCtl">
       <button class="btn" id="tlPlay">▶</button>
+      <button class="btn" id="tlFollow" title="Chase cam: ride along behind the dart">⌖</button>
       <div class="tlspeed"><span class="tlk">SPEED</span><input id="tlSpeed" type="range" min="0" max="9" step="1" value="2"><span id="tlSpeedVal" class="tlv">0.3×</span></div>
       <div class="tlrange"><span class="tlk">FROM</span><span id="tlFrom" class="tlpill">—</span><span class="tlk">TO</span><span id="tlTo" class="tlpill">—</span></div>
     </div>
