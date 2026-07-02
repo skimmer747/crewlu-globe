@@ -92,7 +92,7 @@ export function configureArcs(globe: any) {
     .pointLat((d: { lat: number }) => d.lat).pointLng((d: { lng: number }) => d.lng)
     // Quiet, flush pucks: low altitude so they don't read as pillars, and a muted tone
     // that stays below the bloom threshold (near-white here turns into glowing orbs).
-    .pointColor(() => 'rgba(145, 195, 225, 0.55)').pointAltitude(0.002).pointRadius(0.42)
+    .pointColor(() => 'rgba(180, 220, 245, 0.85)').pointAltitude(0.002).pointRadius(0.42)
 }
 
 export function setArcs(globe: any, solid: Leg[], ghost: Leg[] = [], activeId?: string | null, opts?: ArcPaintOpts) {
