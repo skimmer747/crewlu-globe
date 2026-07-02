@@ -45,10 +45,10 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
 .hud{position:absolute;color:#7fe3ff;letter-spacing:1.5px;font-size:11px;opacity:.9;pointer-events:none;z-index:5}
 .tick{position:absolute;width:24px;height:24px;border-color:rgba(47,214,255,.5);pointer-events:none;z-index:5}
 .tick-b{bottom:104px}
-.chip{background:rgba(8,20,34,.5);border:1px solid rgba(47,214,255,.25);border-radius:9px;padding:9px 12px;backdrop-filter:blur(7px)}
-.sv{font-size:21px;font-weight:800;color:#eaf7ff;letter-spacing:.5px;line-height:1;font-family:Inter,system-ui,sans-serif}
-.sl{font-size:9px;letter-spacing:1.7px;color:#5fb8e0;margin-top:5px}
-#rail{position:absolute;right:34px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;z-index:5;pointer-events:none}
+.chip{background:rgba(8,20,34,.42);border:1px solid rgba(47,214,255,.22);border-radius:8px;padding:6px 10px;backdrop-filter:blur(6px)}
+.sv{font-size:17px;font-weight:800;color:#eaf7ff;letter-spacing:.5px;line-height:1;font-family:Inter,system-ui,sans-serif}
+.sl{font-size:9px;letter-spacing:1.4px;color:#5fb8e0;margin-top:3px;white-space:nowrap}
+#rail{position:absolute;right:34px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-end;gap:7px;z-index:5;pointer-events:none}
 #moment{position:absolute;left:34px;top:54%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;z-index:5;pointer-events:none}
 #tip{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);font-size:10px;color:#5fb8e0;letter-spacing:1.5px;z-index:7;pointer-events:none;opacity:.8}
 #lunar{z-index:7}

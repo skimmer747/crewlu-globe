@@ -227,6 +227,7 @@ async function run() {
     if (full || solid.length !== lastSolidCount || activeLegId !== lastActiveId) {
       setArcs(scene.globe, solid, ghost, activeLegId, { spotIds: spotIds ?? undefined, fleetRank: fleetOn ? fleetRank : undefined })
       const stats = statsFor(solid, meta); hud.setStats(stats); currentMiles = stats.flewMiles; lastStats = stats
+      hud.setConversions(allTime ? `${(currentMiles / EARTH_LAP_NM).toFixed(1)}× EARTH · ${lunarReturns(currentMiles).toFixed(2)} MOON` : '')
       lastSolidCount = solid.length
       lastActiveId = activeLegId
     }
@@ -367,10 +368,7 @@ async function run() {
       scene.globe.pointOfView({ lat: 25, lng: scene.globe.pointOfView().lng, altitude: 2.8 }, 1400)
       draw()
       runOdometer(before)
-      const laps = currentMiles / EARTH_LAP_NM
-      hud.setConversions(`= ${laps.toFixed(1)}× AROUND EARTH · ${lunarReturns(currentMiles).toFixed(2)} LUNAR RETURNS`)
     } else {
-      hud.setConversions('')
       if (savedView) {
         win.start = savedView.start; win.end = savedView.end; playhead = savedView.playhead
         dock.setWindow(win.start, win.end)
