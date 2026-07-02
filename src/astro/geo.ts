@@ -34,3 +34,13 @@ export function greatCirclePoints(a: LatLng, b: LatLng, n: number): LatLng[] {
   for (let i = 0; i < n; i++) out.push(slerp(a, b, i / (n - 1)))
   return out
 }
+
+/** Great-circle angular separation between two points, in degrees (unrounded). */
+export function angularDistanceDeg(a: LatLng, b: LatLng): number {
+  const dLat = toRad(b[0] - a[0])
+  const dLng = toRad(b[1] - a[1])
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2
+  return toDeg(2 * Math.asin(Math.min(1, Math.sqrt(s))))
+}

@@ -16,3 +16,11 @@ export function subsolarPoint(date: Date): { lng: number; lat: number } {
   const lng = ((ra - gmst + 540) % 360) - 180
   return { lng, lat }
 }
+
+import { angularDistanceDeg } from './geo'
+
+/** Sun elevation above the horizon at a point, in degrees (spherical, no refraction). */
+export function sunElevationDeg(lat: number, lng: number, dateMs: number): number {
+  const s = subsolarPoint(new Date(dateMs))
+  return 90 - angularDistanceDeg([lat, lng], [s.lat, s.lng])
+}
