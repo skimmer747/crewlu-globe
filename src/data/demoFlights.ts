@@ -67,7 +67,7 @@ export function demoFlights(now: number = Date.now()): FlightRow[] {
         const schedOn = schedOut + blockMs - 9 * MIN
         const schedIn = schedOut + blockMs
         // Deterministic delay pattern: mostly small, every 7th leg a real ATC hold.
-        const delay = id % 7 === 0 ? 45 * MIN : (((id * 7) % 5) - 1) * 8 * MIN
+        const delay = id % 7 === 0 ? 45 * MIN : (((id * 7) % 5) - 2) * 7 * MIN
         const past = schedIn + delay < now
         rows.push({
           id: `DEMO-L${id}`,

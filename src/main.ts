@@ -168,6 +168,7 @@ async function run() {
   // scheduled landing so the timeline can show the trip's last leg (not just its takeoff).
   const lastLeg = legs[legs.length - 1]
   win.end = Math.max(win.end, lastLeg.landing)
+  if (demo) win.start = legs[0].t - 12 * 3600 * 1000 // demo: show the whole line, not just the current trip
   let playhead = Math.min(Math.max(now, win.start), win.end)
 
   // Deep link (#trip=<id>&play=1): snap the window to that trip and cue the playhead.
