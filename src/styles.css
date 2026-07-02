@@ -149,3 +149,6 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
 @keyframes acqBlink{50%{opacity:0}}
 #eventChip{position:fixed;top:72px;left:50%;transform:translate(-50%,-8px);font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:2.5px;color:#ffd27a;background:rgba(8,20,34,.8);border:1px solid rgba(255,177,95,.4);border-radius:999px;padding:8px 16px;opacity:0;transition:opacity .5s ease,transform .5s ease;pointer-events:none;text-shadow:0 0 10px rgba(255,177,95,.6)}
 #eventChip.show{opacity:1;transform:translate(-50%,0)}
+
+/* WRAPPED: career milestone diamonds on the timeline */
+.mstone{position:absolute;top:10px;width:6px;height:6px;background:#ffd778;transform:translateX(-50%) rotate(45deg);box-shadow:0 0 6px rgba(255,215,120,.8);pointer-events:none}

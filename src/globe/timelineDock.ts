@@ -12,6 +12,7 @@ export interface DockState { legs: Leg[]; trips: Trip[]; domainStart: number; do
 export interface TimelineDock {
   mount(host: HTMLElement): void
   render(): void
+  setWindow(start: number, end: number): void
   setPlayhead(ms: number): void
   setPlaying(playing: boolean): void
   setMomentTrip(label: string | null): void
@@ -30,7 +31,7 @@ const MIN_WIN_MS = 1 * DAY
 const WIN_THROTTLE_MS = 120 // how often the (heavy) globe callback fires during a live shuttle
 const SPRING_MS = 180
 
-export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowStart: number; windowEnd: number; playhead: number; now: number }): TimelineDock {
+export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowStart: number; windowEnd: number; playhead: number; now: number; milestones?: { t: number; label: string }[] }): TimelineDock {
   const legs = init.legs
   const lastLeg = legs[legs.length - 1]
   const domainStart = legs.length ? legs[0].t : init.windowStart
@@ -129,12 +130,17 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
       lastTickPx = px
       return true
     }).map((t) => `<span class="atick" style="left:${tf(t.x).toFixed(3)}%">${t.label}</span>`).join('')
+    // Career milestone diamonds: small amber markers above the track.
+    const mstones = (init.milestones ?? []).map((m) => {
+      if (m.t <= state.windowStart || m.t >= state.windowEnd) return ''
+      return `<span class="mstone" title="${m.label}" style="left:${tf(a.dateToX(m.t)).toFixed(3)}%"></span>`
+    }).join('')
     const ph = cToT(a.dateToX(state.playhead)) * 100
     const mask = o.mask
       ? `<div class="winmask" style="left:${(o.mask.from * 100).toFixed(3)}%;width:${((o.mask.to - o.mask.from) * 100).toFixed(3)}%"></div>`
       : ''
     track.innerHTML =
-      mask + gaps + bands + flights + layovers +
+      mask + gaps + bands + flights + layovers + mstones +
       `<div class="phead" style="left:${ph.toFixed(3)}%"></div>` +
       `<div class="handle hL" data-h="L" style="left:${(barL * 100).toFixed(3)}%"></div>` +
       `<div class="handle hR" data-h="R" style="left:${(barR * 100).toFixed(3)}%"></div>` +
@@ -288,6 +294,12 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
       renderTrack()
     },
     render() { rebuildAxis(); renderTrack() },
+    setWindow(start, end) {
+      state.windowStart = start
+      state.windowEnd = end
+      clampPlayhead()
+      if (host) { rebuildAxis(); renderTrack() }
+    },
     setPlayhead(ms) { state.playhead = Math.min(Math.max(ms, state.windowStart), state.windowEnd); if (host) renderTrack() },
     setPlaying(playing) { if (host) host.querySelector('#tlPlay')!.textContent = playing ? '❚❚' : '▶' },
     setMomentTrip() { /* moment chip is owned by the HUD; dock exposes window/playhead only */ },
