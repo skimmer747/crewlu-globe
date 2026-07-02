@@ -52,3 +52,15 @@ export function moonPhase(date: Date): Phase {
     : waning ? (illum > 0.5 ? '🌖' : '🌘') : (illum > 0.5 ? '🌔' : '🌒')
   return { illum, waning, name, icon }
 }
+
+export interface Terminator { b: number; darkOnRight: boolean }
+
+/** Terminator ellipse for a unit-radius disc. `b = 1 − 2·illum` is the signed
+ *  semi-minor axis: > 0 bulges toward the LIT side, extending the dark region
+ *  past center (crescent); < 0 bulges toward the dark side, shrinking the dark
+ *  region to a sliver (gibbous). Dark area fraction = ½ + b/2 = 1 − illum.
+ *  darkOnRight keeps the old sliding-shadow convention: waning ⇒ dark limb right. */
+export function terminator(illum: number, waning: boolean): Terminator {
+  const f = Math.min(1, Math.max(0, illum))
+  return { b: 1 - 2 * f, darkOnRight: waning }
+}
