@@ -39,7 +39,7 @@ export function createGlobeScene(host: HTMLElement, viewport: HTMLElement): Glob
   // Real bloom: only pixels above the threshold glow — the cyan arcs, the dart's additive
   // cones, and terminator-boosted city lights. The day-side Earth stays below threshold.
   const bloom = new UnrealBloomPass(
-    new THREE.Vector2(host.clientWidth || 800, host.clientHeight || 600), 0.7, 0.4, 0.55)
+    new THREE.Vector2(host.clientWidth || 800, host.clientHeight || 600), 0.55, 0.4, 0.85)
   globe.postProcessingComposer().addPass(bloom)
 
   const size = () => {

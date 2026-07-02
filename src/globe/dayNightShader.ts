@@ -31,8 +31,8 @@ export const dayNightFragment = /* glsl */`
     // Ocean glint: a water-masked specular highlight on the day side (view axis ~ +Z in view space).
     float sea = smoothstep(0.02, 0.12, day.b - day.r);
     vec3 h = normalize(sd + vec3(0.0, 0.0, 1.0));
-    float spec = pow(max(dot(n, h), 0.0), 60.0) * sea * f;
-    vec3 color = mix(nightLit, day.rgb, f) + vec3(0.5, 0.7, 0.9) * spec * 0.35;
+    float spec = pow(max(dot(n, h), 0.0), 140.0) * sea * f;
+    vec3 color = mix(nightLit, day.rgb, f) + vec3(0.5, 0.7, 0.9) * spec * 0.3;
     gl_FragColor = vec4(color, 1.0);
   }
 `
