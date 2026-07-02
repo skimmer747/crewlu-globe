@@ -24,6 +24,7 @@ import { sunElevationDeg } from './astro/sun'
 import { demoFlights } from './data/demoFlights'
 import { parseDeepLink } from './globe/deeplink'
 import { composeShareCard } from './globe/shareCard'
+import { chasePov, altForLeg } from './globe/chaseCam'
 
 const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
 const fmt = (ms: number) => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2,'0')} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
@@ -246,14 +247,12 @@ async function run() {
 
   const dock = createTimelineDock({ legs, trips, windowStart: win.start, windowEnd: win.end, playhead, now })
 
-  // Camera zoom tracks leg length: short hops zoom way in, long hauls pull out (lower altitude = closer).
-  const altForLeg = (miles: number) => Math.min(2.6, Math.max(0.6, 0.6 + miles * 0.00033))
-
   // Chase cam: while a leg flies (and FOLLOW is on) the camera trails just behind the dart,
-  // swooping from a wide view at the runways down toward the surface at cruise. Camera-only —
+  // hugging the surface at cruise (see chaseCam.ts for why it must fly this low). Camera-only —
   // per-frame pointOfView with 0ms transitions; never touches the canvas (raycasting constraint).
   let follow = true
   let chase: { leg: (typeof legs)[number]; t0: number; dur: number } | null = null
+  let lastFly: { leg: (typeof legs)[number]; t0: number; dur: number } | null = null // most recent leg flight, so toggling FOLLOW mid-leg can hop on
   const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
   tickChase = () => {
     if (!chase) return
@@ -264,10 +263,7 @@ async function run() {
       scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, 800)
       return
     }
-    const [lat, lng] = slerp(leg.s, leg.e, clamp01(p - 0.08)) // trail the dart by 8% of the leg
-    const cruise = altForLeg(leg.miles) * 0.55
-    const altitude = cruise + (1.2 - cruise) * (1 - Math.sin(Math.PI * p))
-    scene.globe.pointOfView({ lat, lng, altitude: Math.max(0.5, altitude) }, 0)
+    scene.globe.pointOfView(chasePov(leg.s, leg.e, leg.miles, p), 0)
   }
 
   const playback = createPlayback({
@@ -283,7 +279,8 @@ async function run() {
       beacon.flyLeg(leg, dur)
       dart.flyLeg(leg, dur) // the 3D dart rides the same leg, in sync
 
-      if (follow) chase = { leg, t0: performance.now(), dur } // ride along behind the dart
+      lastFly = { leg, t0: performance.now(), dur }
+      if (follow) chase = lastFly // ride along behind the dart
       else scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, dur)
     },
     onPlayhead: (ms) => { playhead = ms; dock.setPlayhead(ms); draw(false); checkGoldenHour(ms) },
@@ -338,7 +335,11 @@ async function run() {
 
   dock.onPlayToggle(() => playback.toggle())
   dock.onSpeed((mult) => playback.setSpeed(mult))
-  dock.onFollow((on) => { follow = on; if (!on) chase = null })
+  dock.onFollow((on) => {
+    follow = on
+    if (!on) chase = null
+    else if (playback.isPlaying() && lastFly) chase = lastFly // hop onto the leg already flying
+  })
   dock.onSeek((ms) => {
     playhead = ms
     playback.pause()
