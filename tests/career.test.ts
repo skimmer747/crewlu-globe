@@ -85,6 +85,20 @@ describe('recordsFor — same-airport and base-at-the-time rules', () => {
     const r = recordsFor(legs)
     expect(r.topAirport).toMatchObject({ iata: 'SDF', landings: 2 })
   })
+  it('base airport can still win with its reduced count (landings excluded, airport not erased)', () => {
+    seq = 0
+    const legs = [
+      // SDF raw 4 landings, one of them at-base and mid-sequence -> counts 3; ORD counts 2
+      leg({ from: 'ANC', to: 'SDF', base: 'ANC' }),
+      leg({ from: 'ORD', to: 'SDF', base: 'SDF' }), // at-base, must not erase SDF's tally
+      leg({ from: 'ANC', to: 'SDF', base: 'ANC' }),
+      leg({ from: 'ANC', to: 'SDF', base: 'ANC' }),
+      leg({ from: 'SDF', to: 'ORD', base: 'SDF' }),
+      leg({ from: 'SDF', to: 'ORD', base: 'SDF' }),
+    ]
+    const r = recordsFor(legs)
+    expect(r.topAirport).toMatchObject({ iata: 'SDF', landings: 3 })
+  })
 })
 
 describe('milestonesFor', () => {
