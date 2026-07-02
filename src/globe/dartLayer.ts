@@ -14,8 +14,8 @@ const SIZE_FRAC = 0.11       // dart length ≈ this fraction of the leg's surfa
 const MIN_SIZE = 1.3         // ...floored so short hops still show a small dart
 const MAX_SIZE = 5.0         // ...and capped so long hauls don't get huge
 const GEOM_LEN = 3.05        // nose-to-tail length of the unit geometry
-const GROW_END = 0.16         // fraction of the leg spent climbing out (scale 0 -> 1)
-const SHRINK_START = 0.84     // fraction after which it descends (scale 1 -> 0)
+const CLIMB_MS = 20 * 60000   // real-time climb-out duration mapped onto the leg
+const DESCENT_MS = 30 * 60000 // real-time descent duration mapped onto the leg
 const SKIM_ALT = 0.012        // altitude at the runway ends (globe-radius units)
 const MAX_BUMP = 0.34         // cap on the mid-leg cruise climb
 const CLIMB = 0.18            // how much of the great-circle angle becomes cruise altitude
@@ -24,11 +24,24 @@ const BANK = 0.3             // cruise bank angle (rad, ~17°); eased to level a
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t))
 const smooth = (t: number) => { t = clamp01(t); return t * t * (3 - 2 * t) }
 
+export interface EnvelopeFractions { growEnd: number; shrinkStart: number }
+
+/**
+ * Time-honest climb/descent fractions for a leg: ~20 min of climb and ~30 min of descent
+ * as fractions of the actual airborne span, clamped so short hops still animate and a
+ * degenerate span can't invert the envelope. A 14-hour leg cruises level for ~13 hours.
+ */
+export function envelopeFractions(airborneMs: number): EnvelopeFractions {
+  const g = Math.min(0.45, Math.max(0.05, CLIMB_MS / Math.max(1, airborneMs)))
+  const d = Math.min(0.45, Math.max(0.06, DESCENT_MS / Math.max(1, airborneMs)))
+  return { growEnd: g, shrinkStart: 1 - d }
+}
+
 // Scale envelope across the leg: grow on climb-out, hold at cruise, shrink on descent.
-function envelope(p: number): number {
+function envelope(p: number, f: EnvelopeFractions): number {
   if (p <= 0 || p >= 1) return 0
-  if (p < GROW_END) return smooth(p / GROW_END)
-  if (p > SHRINK_START) return smooth((1 - p) / (1 - SHRINK_START))
+  if (p < f.growEnd) return smooth(p / f.growEnd)
+  if (p > f.shrinkStart) return smooth((1 - p) / (1 - f.shrinkStart))
   return 1
 }
 
@@ -105,18 +118,24 @@ export interface DartLayer {
 export function createDartLayer(): DartLayer {
   const object = buildDart()
   let globe: any = null
-  let flying: { leg: Leg; t0: number; dur: number; ang: number } | null = null
+  let flying: { leg: Leg; t0: number; dur: number; ang: number; frac: EnvelopeFractions } | null = null
   let pres = 0
 
   const coords = (lat: number, lng: number, alt: number) => {
     const c = globe.getCoords(lat, lng, alt)
     return new THREE.Vector3(c.x, c.y, c.z)
   }
-  // Surface-relative altitude bump so the dart climbs out, cruises high, and descends.
-  const altAt = (p: number, ang: number) => SKIM_ALT + Math.min(MAX_BUMP, ang * CLIMB) * Math.sin(Math.PI * clamp01(p))
-  const at = (p: number, f: { leg: Leg; ang: number }) => {
+  // Surface-relative altitude: climb over the time-based climb fraction, hold a cruise
+  // plateau, descend over the descent fraction — no more sine "climb" across a whole leg.
+  const altAt = (p: number, ang: number, f: EnvelopeFractions) => {
+    p = clamp01(p)
+    const rise = smooth(Math.min(1, p / f.growEnd))
+    const fall = smooth(Math.min(1, (1 - p) / (1 - f.shrinkStart)))
+    return SKIM_ALT + Math.min(MAX_BUMP, ang * CLIMB) * Math.min(rise, fall)
+  }
+  const at = (p: number, f: { leg: Leg; ang: number; frac: EnvelopeFractions }) => {
     const [lat, lng] = slerp(f.leg.s, f.leg.e, clamp01(p))
-    return coords(lat, lng, altAt(p, f.ang))
+    return coords(lat, lng, altAt(p, f.ang, f.frac))
   }
 
   const hide = () => { pres = 0; object.visible = false; object.scale.setScalar(0) }
@@ -127,13 +146,13 @@ export function createDartLayer(): DartLayer {
       globe = g
       g.customLayerData([{}]).customThreeObject(() => object).customThreeObjectUpdate(() => {})
     },
-    flyLeg(leg, durationMs) { flying = { leg, t0: performance.now(), dur: Math.max(1, durationMs), ang: leg.miles / EARTH_NM } },
+    flyLeg(leg, durationMs) { flying = { leg, t0: performance.now(), dur: Math.max(1, durationMs), ang: leg.miles / EARTH_NM, frac: envelopeFractions(leg.landing - leg.takeoff) } },
     presence() { return pres },
     stop() { flying = null; hide() },
     tick() {
       if (!flying || !globe) { if (pres !== 0) hide(); return }
       const p = clamp01((performance.now() - flying.t0) / flying.dur)
-      pres = envelope(p)
+      pres = envelope(p, flying.frac)
       if (pres <= 0.001) { object.visible = false; object.scale.setScalar(0); if (p >= 1) flying = null; return }
 
       const pos = at(p, flying)
