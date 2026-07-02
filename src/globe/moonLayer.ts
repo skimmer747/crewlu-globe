@@ -33,6 +33,7 @@ export function createMoonLayer(): MoonLayer {
   const photo = new Image()
   let photoReady = false
   photo.onload = () => { photoReady = true; draw() }
+  photo.onerror = () => console.warn('moon-disc.webp failed to load — using gradient fallback')
   photo.src = '/textures/moon-disc.webp'
 
   const nextBucket = (px: number) => px <= 256 ? 256 : px <= 512 ? 512 : 1024
@@ -68,20 +69,24 @@ export function createMoonLayer(): MoonLayer {
       const R2 = r + blur * 2 // overshoot the limb so the blur never lightens the dark limb edge
       ctx.save()
       ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.clip()
-      ;(ctx as any).filter = `blur(${blur}px)`
+      ctx.filter = `blur(${blur}px)`
       ctx.beginPath()
       ctx.moveTo(c, c - R2)
       ctx.arc(c, c, R2, -Math.PI / 2, Math.PI / 2, sgn < 0) // top -> dark-side limb -> bottom
       // terminator back up: half-ellipse of half-width |b|·r; crescents bulge toward the
       // lit side (-sgn), gibbous toward the dark side (+sgn)
+      // terminator with true radiusY = r so thin-crescent horns pinch to the poles;
+      // lineTo legs stitch the r <-> R2 gap along the centerline (zero enclosed area)
       const a = Math.abs(t.b) * r
       const bulgeRight = (t.b < 0 ? sgn : -sgn) > 0
-      if (bulgeRight) ctx.ellipse(c, c, a, R2, 0, Math.PI / 2, -Math.PI / 2, true)
-      else ctx.ellipse(c, c, a, R2, 0, Math.PI / 2, Math.PI * 1.5, false)
+      ctx.lineTo(c, c + r)
+      if (bulgeRight) ctx.ellipse(c, c, a, r, 0, Math.PI / 2, -Math.PI / 2, true)
+      else ctx.ellipse(c, c, a, r, 0, Math.PI / 2, Math.PI * 1.5, false)
+      ctx.lineTo(c, c - R2)
       ctx.closePath()
       ctx.fillStyle = 'rgba(7,11,20,0.86)'
       ctx.fill()
-      ;(ctx as any).filter = 'none'
+      ctx.filter = 'none'
       ctx.restore()
     }
   }
