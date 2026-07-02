@@ -14,7 +14,7 @@
 
 **Files:** Modify: `src/model.ts`, `src/data/flights.ts`, `tests/transform.test.ts` (row factory only)
 
-- [ ] **Step 1:** In `src/model.ts` FlightRow, after `scheduled_landing_time`, add:
+- [x] **Step 1:** In `src/model.ts` FlightRow, after `scheduled_landing_time`, add:
 
 ```ts
   scheduled_block_in_time: string | null
@@ -49,16 +49,16 @@ Extend Stats:
 export interface Stats { miles: number; airports: number; countries: number; hours: number; flewMiles: number; rodeMiles: number; onTimePct: number | null }
 ```
 
-- [ ] **Step 2:** In `src/data/flights.ts` COLS add `scheduled_block_in_time,scheduled_block_time,block_out_time,landing_time,block_in_time` (keep existing fields).
-- [ ] **Step 3:** In `tests/transform.test.ts` row() factory defaults add: `scheduled_block_in_time: null, scheduled_block_time: null, block_out_time: null, landing_time: null, block_in_time: null,`
-- [ ] **Step 4:** Run `npx tsc --noEmit` — expect errors ONLY in transform.ts (Leg missing new fields) — that's Task 2's cue. If other files error, fix types there first.
-- [ ] **Step 5:** No commit yet (repo won't compile until Task 2; Tasks 1+2 commit together).
+- [x] **Step 2:** In `src/data/flights.ts` COLS add `scheduled_block_in_time,scheduled_block_time,block_out_time,landing_time,block_in_time` (keep existing fields).
+- [x] **Step 3:** In `tests/transform.test.ts` row() factory defaults add: `scheduled_block_in_time: null, scheduled_block_time: null, block_out_time: null, landing_time: null, block_in_time: null,`
+- [x] **Step 4:** Run `npx tsc --noEmit` — expect errors ONLY in transform.ts (Leg missing new fields) — that's Task 2's cue. If other files error, fix types there first.
+- [x] **Step 5:** No commit yet (repo won't compile until Task 2; Tasks 1+2 commit together).
 
 ### Task 2: Actual-first resolution in transform.ts (TDD)
 
 **Files:** Modify: `src/data/transform.ts`, Test: `tests/transform.test.ts`
 
-- [ ] **Step 1: Write failing tests** (append to describe block):
+- [x] **Step 1: Write failing tests** (append to describe block):
 
 ```ts
   it('prefers actual OOOI over scheduled and carries sched/act pairs', () => {
@@ -111,8 +111,8 @@ export interface Stats { miles: number; airports: number; countries: number; hou
   })
 ```
 
-- [ ] **Step 2:** Run `npx vitest run tests/transform.test.ts` — expect the new tests FAIL (fields undefined).
-- [ ] **Step 3: Implement.** In `src/data/transform.ts` delete the `legTime` helper and replace the body of the per-row loop's time logic with:
+- [x] **Step 2:** Run `npx vitest run tests/transform.test.ts` — expect the new tests FAIL (fields undefined).
+- [x] **Step 3: Implement.** In `src/data/transform.ts` delete the `legTime` helper and replace the body of the per-row loop's time logic with:
 
 ```ts
 const ts = (s: string | null | undefined): number | null => {
@@ -145,14 +145,14 @@ and inside the loop (after `miles`):
 
 Leg push gains `out: t, in: inMs, blockMs, sched, act`.
 
-- [ ] **Step 4:** `npx vitest run tests/transform.test.ts` — ALL pass (old tests exercise the scheduled/estimate fallback paths). Then `npx tsc --noEmit` clean.
-- [ ] **Step 5:** Commit: `git add -A && git commit -m "Gate to Gate: actual-first OOOI resolution with sched/act pairs on every leg"`
+- [x] **Step 4:** `npx vitest run tests/transform.test.ts` — ALL pass (old tests exercise the scheduled/estimate fallback paths). Then `npx tsc --noEmit` clean.
+- [x] **Step 5:** Commit: `git add -A && git commit -m "Gate to Gate: actual-first OOOI resolution with sched/act pairs on every leg"`
 
 ### Task 3: Logbook stats + layover + lunar (TDD)
 
 **Files:** Modify: `src/data/transform.ts` (statsFor, computeAirportStats), `src/main.ts` (one line), Test: `tests/transform.test.ts`
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
 
 ```ts
   it('stats: real block hours, FLEW/RODE split, on-time pct', () => {
@@ -183,8 +183,8 @@ Leg push gains `out: t, in: inMs, blockMs, sched, act`.
 
 (import `computeAirportStats` in the test file's transform import.)
 
-- [ ] **Step 2:** `npx vitest run tests/transform.test.ts` — new tests FAIL.
-- [ ] **Step 3: Implement.** statsFor:
+- [x] **Step 2:** `npx vitest run tests/transform.test.ts` — new tests FAIL.
+- [x] **Step 3: Implement.** statsFor:
 
 ```ts
 export function statsFor(legs: Leg[], airports: AirportIndex): Stats {
@@ -209,14 +209,14 @@ export function statsFor(legs: Leg[], airports: AirportIndex): Stats {
 
 computeAirportStats: change `legs[i + 1].t - leg.landing` → `legs[i + 1].t - leg.in`. In `src/main.ts` draw(): `currentMiles = stats.flewMiles` (was `stats.miles`).
 
-- [ ] **Step 4:** `npx vitest run` — all green; `npx tsc --noEmit` clean.
-- [ ] **Step 5:** Commit: `git commit -am "Gate to Gate: logbook block hours, FLEW/RODE split, A14 on-time pct, block-to-block layovers, flew-only lunar miles"`
+- [x] **Step 4:** `npx vitest run` — all green; `npx tsc --noEmit` clean.
+- [x] **Step 5:** Commit: `git commit -am "Gate to Gate: logbook block hours, FLEW/RODE split, A14 on-time pct, block-to-block layovers, flew-only lunar miles"`
 
 ### Task 4: Arc-label delta telemetry (TDD)
 
 **Files:** Modify: `src/globe/arcsLayer.ts`, Test: `tests/arcsLayer.test.ts` (inspect existing tests first; keep them green)
 
-- [ ] **Step 1: Failing test** (append; adapt leg factory to whatever the existing test file uses, adding the new Leg fields):
+- [x] **Step 1: Failing test** (append; adapt leg factory to whatever the existing test file uses, adding the new Leg fields):
 
 ```ts
   it('legDeltaLine formats OFF/ON deltas and block with sked', () => {
@@ -231,8 +231,8 @@ computeAirportStats: change `legs[i + 1].t - leg.landing` → `legs[i + 1].t - l
   })
 ```
 
-- [ ] **Step 2:** Run — FAIL (no export).
-- [ ] **Step 3: Implement** in arcsLayer.ts:
+- [x] **Step 2:** Run — FAIL (no export).
+- [x] **Step 3: Implement** in arcsLayer.ts:
 
 ```ts
 const fmtDelta = (ms: number): string => {
@@ -264,14 +264,14 @@ In `arcLabel`, for non-ghost legs append after the status span:
 
 and insert `${delta}` before `</div>`.
 
-- [ ] **Step 4:** `npx vitest run` green; `npx tsc --noEmit` clean.
-- [ ] **Step 5:** Commit: `git commit -am "Gate to Gate: OFF/ON/BLOCK delta telemetry on arc labels"`
+- [x] **Step 4:** `npx vitest run` green; `npx tsc --noEmit` clean.
+- [x] **Step 5:** Commit: `git commit -am "Gate to Gate: OFF/ON/BLOCK delta telemetry on arc labels"`
 
 ### Task 5: Time-based dart envelope (TDD)
 
 **Files:** Modify: `src/globe/dartLayer.ts`, Test: `tests/dartLayer.test.ts` (create)
 
-- [ ] **Step 1: Failing test** (`tests/dartLayer.test.ts`):
+- [x] **Step 1: Failing test** (`tests/dartLayer.test.ts`):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -294,8 +294,8 @@ describe('envelopeFractions', () => {
 })
 ```
 
-- [ ] **Step 2:** Run — FAIL (no export).
-- [ ] **Step 3: Implement** in dartLayer.ts:
+- [x] **Step 2:** Run — FAIL (no export).
+- [x] **Step 3: Implement** in dartLayer.ts:
 
 ```ts
 const CLIMB_MS = 20 * 60000, DESCENT_MS = 30 * 60000
@@ -318,21 +318,21 @@ export function envelopeFractions(airborneMs: number): { growEnd: number; shrink
 
 with `at(p, f)` passing `flying.frac` through (both call sites in `tick`).
 
-- [ ] **Step 4:** `npx vitest run` green; `npx tsc --noEmit` clean.
-- [ ] **Step 5:** Commit: `git commit -am "Gate to Gate: time-based climb/descent envelope with cruise plateau"`
+- [x] **Step 4:** `npx vitest run` green; `npx tsc --noEmit` clean.
+- [x] **Step 5:** Commit: `git commit -am "Gate to Gate: time-based climb/descent envelope with cruise plateau"`
 
 ### Task 6: HUD sub-lines, timeline sked underlay, five-phase positionAt
 
 **Files:** Modify: `src/globe/hud.ts`, `src/globe/timelineDock.ts`, `src/styles.css`, `src/main.ts`
 
-- [ ] **Step 1: HUD.** In HUD_HTML miles chip add `<div class="sl" id="sMilesSub" style="margin-top:3px"></div>` after the NAUTICAL MILES label; hours chip add `<div class="sl" id="sOnTime" style="margin-top:3px"></div>`. In setStats append:
+- [x] **Step 1: HUD.** In HUD_HTML miles chip add `<div class="sl" id="sMilesSub" style="margin-top:3px"></div>` after the NAUTICAL MILES label; hours chip add `<div class="sl" id="sOnTime" style="margin-top:3px"></div>`. In setStats append:
 
 ```ts
       q('#sMilesSub').textContent = `FLEW ${Math.round(s.flewMiles).toLocaleString()} · RODE ${Math.round(s.rodeMiles).toLocaleString()}`
       q('#sOnTime').textContent = s.onTimePct != null ? `ON-TIME ARR ${s.onTimePct}%` : ''
 ```
 
-- [ ] **Step 2: Timeline underlay.** In timelineDock.ts renderTrack, replace the flights map body with:
+- [x] **Step 2: Timeline underlay.** In timelineDock.ts renderTrack, replace the flights map body with:
 
 ```ts
     const flights = state.legs.map((l, i) => {
@@ -357,7 +357,7 @@ In styles.css, next to the existing `.seg.air` rules (grep `.seg` first, match t
 
 Adjust height/margin against the real `.seg.air` metrics so the underlay hugs the bottom edge of the actual bar.
 
-- [ ] **Step 3: positionAt phases.** In main.ts replace the two ground returns:
+- [x] **Step 3: positionAt phases.** In main.ts replace the two ground returns:
 
 ```ts
     if (t < prev.takeoff) return { latlng: prev.s, label: `${prev.from} · TAXI OUT` }
@@ -369,18 +369,18 @@ Adjust height/margin against the real `.seg.air` metrics so the underlay hugs th
     return { latlng: prev.e, label: prev.to }
 ```
 
-- [ ] **Step 4:** `npx vitest run && npx tsc --noEmit` — green/clean.
-- [ ] **Step 5:** Commit: `git commit -am "Gate to Gate: HUD flew/rode + on-time lines, scheduled-span timeline underlay, taxi phases in position readout"`
+- [x] **Step 4:** `npx vitest run && npx tsc --noEmit` — green/clean.
+- [x] **Step 5:** Commit: `git commit -am "Gate to Gate: HUD flew/rode + on-time lines, scheduled-span timeline underlay, taxi phases in position readout"`
 
 ### Task 7: Visual verification harness + full gate
 
 **Files:** Temporary (NOT committed): `harness.html`, `src/harness.ts`
 
-- [ ] **Step 1:** Create `src/harness.ts` importing the real pipeline with synthetic FlightRows (bypasses auth/Supabase): a delayed leg (actual 45m late vs sched), a 14h long-haul, a deadhead, and a garbage row (landing before takeoff). Feed through `flightsToLegs` → render globe scene + arcs + HUD + dock exactly as main.ts does (copy the wiring minus `requireSession`/`fetchFlights`). `harness.html` mirrors index.html but loads `/src/harness.ts`.
-- [ ] **Step 2:** `npx vite --port 8798` and open `http://localhost:8798/harness.html` via preview tools. Hidden preview tabs pause rAF — drive WebGL manually (`globe.renderer().setSize(...)` + render) per the known gotcha before screenshotting.
-- [ ] **Step 3:** Verify: HUD shows real block hours + FLEW/RODE + ON-TIME lines; arc tooltip shows OFF/ON/BLOCK deltas on the delayed leg; timeline shows the dim scheduled underlay offset from the actual bar; scrubbing before takeoff shows "· TAXI OUT", after landing "· TAXI IN"; playback of the long-haul holds a cruise plateau (dart at full size mid-leg, no continuous climb); lunar readout uses flew-only miles. Zero console errors.
-- [ ] **Step 4:** Delete harness files. `npm test && npm run build` — both clean. `git status` clean except intended files.
-- [ ] **Step 5:** Report to user with evidence; offer deploy (`npm run deploy`) — do NOT run it without approval.
+- [x] **Step 1:** Create `src/harness.ts` importing the real pipeline with synthetic FlightRows (bypasses auth/Supabase): a delayed leg (actual 45m late vs sched), a 14h long-haul, a deadhead, and a garbage row (landing before takeoff). Feed through `flightsToLegs` → render globe scene + arcs + HUD + dock exactly as main.ts does (copy the wiring minus `requireSession`/`fetchFlights`). `harness.html` mirrors index.html but loads `/src/harness.ts`.
+- [x] **Step 2:** `npx vite --port 8798` and open `http://localhost:8798/harness.html` via preview tools. Hidden preview tabs pause rAF — drive WebGL manually (`globe.renderer().setSize(...)` + render) per the known gotcha before screenshotting.
+- [x] **Step 3:** Verify: HUD shows real block hours + FLEW/RODE + ON-TIME lines; arc tooltip shows OFF/ON/BLOCK deltas on the delayed leg; timeline shows the dim scheduled underlay offset from the actual bar; scrubbing before takeoff shows "· TAXI OUT", after landing "· TAXI IN"; playback of the long-haul holds a cruise plateau (dart at full size mid-leg, no continuous climb); lunar readout uses flew-only miles. Zero console errors.
+- [x] **Step 4:** Delete harness files. `npm test && npm run build` — both clean. `git status` clean except intended files.
+- [x] **Step 5:** Report to user with evidence; offer deploy (`npm run deploy`) — do NOT run it without approval.
 
 ## Self-review notes
 
