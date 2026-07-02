@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { arcPaint, combineArcData } from '../src/globe/arcsLayer'
+import { arcPaint, combineArcData, legDeltaLine } from '../src/globe/arcsLayer'
 import type { Leg } from '../src/model'
 
 const leg = (o: Partial<Leg>): Leg => ({
@@ -17,6 +17,21 @@ describe('arcsLayer helpers', () => {
     const [c] = arcPaint(leg({ dh: false, __ghost: true } as any))
     expect(c).toMatch(/^rgba\(/)
     expect(c).toContain('0.18')
+  })
+  it('legDeltaLine formats OFF/ON deltas and block with sked', () => {
+    const l = leg({ blockMs: (7 * 60 + 42) * 60000,
+      sched: { out: 0, off: 10 * 60000, on: null, in: (7 * 60 + 55) * 60000 },
+      act: { out: 0, off: 24 * 60000, on: null, in: null } })
+    expect(legDeltaLine(l)).toBe('OFF +0:14 · BLOCK 7+42 (SKED 7+55)')
+  })
+  it('legDeltaLine shows early arrivals negative and skips sked when equal', () => {
+    const l = leg({ blockMs: 5 * 3600000,
+      sched: { out: 0, off: null, on: 6 * 3600000, in: 5 * 3600000 },
+      act: { out: 0, off: null, on: 6 * 3600000 - 6 * 60000, in: null } })
+    expect(legDeltaLine(l)).toBe('ON −0:06 · BLOCK 5+00')
+  })
+  it('legDeltaLine falls back to block only without comparable pairs', () => {
+    expect(legDeltaLine(leg({ blockMs: 90 * 60000 }))).toBe('BLOCK 1+30')
   })
   it('combineArcData tags ghosts and keeps order solid-first', () => {
     const out = combineArcData([leg({ id: 's' })], [leg({ id: 'g' })])

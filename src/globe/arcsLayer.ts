@@ -16,6 +16,28 @@ export function arcPaint(d: ArcLeg): [string, string] {
   return [c, c]
 }
 
+const fmtDelta = (ms: number): string => {
+  const sign = ms < 0 ? '−' : '+'
+  const m = Math.round(Math.abs(ms) / 60000)
+  return `${sign}${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`
+}
+const fmtBlock = (ms: number): string => {
+  const m = Math.round(ms / 60000)
+  return `${Math.floor(m / 60)}+${String(m % 60).padStart(2, '0')}`
+}
+
+/** "OFF +0:14 · ON −0:06 · BLOCK 7+42 (SKED 7+55)" — deltas only where both sides exist. */
+export function legDeltaLine(d: Leg): string {
+  const parts: string[] = []
+  if (d.act.off != null && d.sched.off != null) parts.push(`OFF ${fmtDelta(d.act.off - d.sched.off)}`)
+  if (d.act.on != null && d.sched.on != null) parts.push(`ON ${fmtDelta(d.act.on - d.sched.on)}`)
+  let block = `BLOCK ${fmtBlock(d.blockMs)}`
+  const schedBlock = d.sched.in != null && d.sched.out != null ? d.sched.in - d.sched.out : null
+  if (schedBlock != null && Math.abs(schedBlock - d.blockMs) >= 60000) block += ` (SKED ${fmtBlock(schedBlock)})`
+  parts.push(block)
+  return parts.join(' · ')
+}
+
 export function combineArcData(solid: Leg[], ghost: Leg[], activeId?: string | null): ArcLeg[] {
   return [
     ...solid.map((l) => (activeId && l.id === activeId ? { ...l, __active: true } : l)),
@@ -38,7 +60,8 @@ export function configureArcs(globe: any) {
       const status = d.__ghost
         ? (d.dh ? 'UPCOMING · DEADHEAD' : 'UPCOMING · FLIGHT')
         : (d.dh ? 'DEADHEAD (rode)' : 'FLEW (operated)')
-      return `<div style="font-family:monospace;color:#eaf7ff;background:rgba(8,20,34,.85);padding:6px 9px;border:1px solid rgba(47,214,255,.4);border-radius:7px;font-size:11px"><b style="color:#2fd6ff">${d.from} → ${d.to}</b> · ${d.miles.toLocaleString()} nm<br><span style="color:${hue};font-size:9px;letter-spacing:1px">${status}</span></div>`
+      const delta = d.__ghost ? '' : `<br><span style="color:#9fd8c0;font-size:9px;letter-spacing:1px">${legDeltaLine(d)}</span>`
+      return `<div style="font-family:monospace;color:#eaf7ff;background:rgba(8,20,34,.85);padding:6px 9px;border:1px solid rgba(47,214,255,.4);border-radius:7px;font-size:11px"><b style="color:#2fd6ff">${d.from} → ${d.to}</b> · ${d.miles.toLocaleString()} nm<br><span style="color:${hue};font-size:9px;letter-spacing:1px">${status}</span>${delta}</div>`
     })
     .pointLat((d: { lat: number }) => d.lat).pointLng((d: { lng: number }) => d.lng)
     .pointColor(() => '#fff7e0').pointAltitude(0.012).pointRadius(0.6)
