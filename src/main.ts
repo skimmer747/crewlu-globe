@@ -176,7 +176,7 @@ async function run() {
     const { solid, ghost } = splitAtPlayhead(inWin, playhead)
     if (full || solid.length !== lastSolidCount || activeLegId !== lastActiveId) {
       setArcs(scene.globe, solid, ghost, activeLegId)
-      const stats = statsFor(solid, meta); hud.setStats(stats); currentMiles = stats.miles
+      const stats = statsFor(solid, meta); hud.setStats(stats); currentMiles = stats.flewMiles
       lastSolidCount = solid.length
       lastActiveId = activeLegId
     }

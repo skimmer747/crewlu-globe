@@ -4,7 +4,7 @@ import { groupIntoTrips } from '../src/data/trips'
 import type { Leg } from '../src/model'
 
 const leg = (o: Partial<Leg>): Leg => ({
-  id: 'x', from: 'SDF', to: 'ANC', s: [10, 10], e: [20, 20], t: 0, takeoff: 0, landing: 0, dh: false, miles: 1, aircraft: null, tripId: null, ...o,
+  id: 'x', from: 'SDF', to: 'ANC', s: [10, 10], e: [20, 20], t: 0, takeoff: 0, landing: 0, out: 0, in: 0, blockMs: 0, sched: { out: null, off: null, on: null, in: null }, act: { out: null, off: null, on: null, in: null }, dh: false, miles: 1, aircraft: null, tripId: null, ...o,
 })
 
 describe('schedule', () => {
