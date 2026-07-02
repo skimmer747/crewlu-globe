@@ -69,6 +69,10 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
 .seg.air{border-radius:2px}
 .seg.air.past{background:#1f9cc4;opacity:.98}
 .seg.air.future{background:#7a5fe0;opacity:.98}
+/* Scheduled-span underlay: thin strip below the actual air bar showing where the leg was SUPPOSED to fly (only drawn when it differs by >=1 min). */
+.seg.air.sked{top:43px;height:2.5px;border-radius:1px}
+.seg.air.sked.past{background:#2fd6ff;opacity:.45}
+.seg.air.sked.future{background:#a78bfa;opacity:.45}
 .seg.dim{background:#39506a;opacity:.35}
 .gap{position:absolute;top:22px;height:18px;border-left:1.5px dashed rgba(150,170,190,.55);border-right:1.5px dashed rgba(150,170,190,.55)}
 .gaplbl{position:absolute;top:-16px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;color:#9fb6cc;letter-spacing:.4px}

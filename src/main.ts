@@ -135,18 +135,19 @@ async function run() {
   win.end = Math.max(win.end, lastLeg.landing)
   let playhead = Math.min(Math.max(now, win.start), win.end)
 
-  // Where the pilot is at an instant: airborne on a leg (between its scheduled takeoff and landing),
-  // or on the ground — taxiing out before takeoff, or sitting at the last arrival.
+  // Where the pilot is at an instant, OOOI-phased: taxi-out (out -> off), airborne
+  // (off -> on), taxi-in (on -> in), or parked at the last arrival.
   const positionAt = (t: number): { latlng: [number, number]; label: string } => {
     let prev: (typeof legs)[number] | null = null
     for (const l of legs) { if (l.t <= t) prev = l; else break }
     if (!prev) { const f = legs[0]; return { latlng: f.s, label: f.from } } // before the first departure
-    if (t < prev.takeoff) return { latlng: prev.s, label: prev.from } // pushed back, not yet airborne
+    if (t < prev.takeoff) return { latlng: prev.s, label: `${prev.from} · TAXI OUT` } // pushed back, not yet airborne
     if (t <= prev.landing) {
       const frac = Math.min(1, Math.max(0, (t - prev.takeoff) / Math.max(1, prev.landing - prev.takeoff)))
       return { latlng: slerp(prev.s, prev.e, frac), label: `${prev.from} → ${prev.to}` } // in the air
     }
-    return { latlng: prev.e, label: prev.to } // landed, on the ground
+    if (t <= prev.in) return { latlng: prev.e, label: `${prev.to} · TAXI IN` } // landed, rolling to the gate
+    return { latlng: prev.e, label: prev.to } // parked
   }
 
   // Arc rebuilds are gated on the solid-count OR the active (in-flight) leg changing.

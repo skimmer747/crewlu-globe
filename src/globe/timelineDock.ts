@@ -87,13 +87,20 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
         ? seg(p.x0, nowX, 'past') + seg(nowX, p.x1, 'future')
         : seg(p.x0, p.x1, p.startMs >= state.now ? 'future' : 'past'),
     ).join('')
-    // Individual flight legs: a slightly darker bar over the band spanning the leg's estimated air
-    // time (capped at the next departure), so you can see/scrub the in-air vs on-the-ground stretches.
+    // Individual flight legs: a slightly darker bar over the band spanning the leg's ACTUAL air
+    // time (capped at the next departure). When the scheduled span differs by a minute or more,
+    // a dim underlay shows where the leg was supposed to fly — the visible sched-vs-actual delta.
     const flights = state.legs.map((l, i) => {
       const next = state.legs[i + 1]
       const a0 = l.takeoff, a1 = Math.min(l.landing, next ? next.t : Infinity)
       if (a1 <= state.windowStart || a0 >= state.windowEnd) return ''
-      return seg(a.dateToX(Math.max(a0, state.windowStart)), a.dateToX(Math.min(a1, state.windowEnd)), `air ${era(l.takeoff)}`)
+      let sked = ''
+      if (l.sched.off != null && l.sched.on != null && l.sched.on > l.sched.off &&
+          (Math.abs(l.sched.off - l.takeoff) >= 60000 || Math.abs(l.sched.on - l.landing) >= 60000) &&
+          l.sched.on > state.windowStart && l.sched.off < state.windowEnd) {
+        sked = seg(a.dateToX(Math.max(l.sched.off, state.windowStart)), a.dateToX(Math.min(l.sched.on, state.windowEnd)), `air sked ${era(l.takeoff)}`)
+      }
+      return sked + seg(a.dateToX(Math.max(a0, state.windowStart)), a.dateToX(Math.min(a1, state.windowEnd)), `air ${era(l.takeoff)}`)
     }).join('')
     // Layover airport codes: the ground stop between two flights of the same trip. Only labeled when
     // the gap is wide enough to read without crowding the flanking flight bars.

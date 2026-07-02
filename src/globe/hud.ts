@@ -49,6 +49,8 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
       q('#sApts').textContent = String(s.airports)
       q('#sCountries').textContent = String(s.countries)
       q('#sHours').textContent = s.hours.toLocaleString()
+      q('#sMilesSub').textContent = `FLEW ${Math.round(s.flewMiles).toLocaleString()} · RODE ${Math.round(s.rodeMiles).toLocaleString()}`
+      q('#sOnTime').textContent = s.onTimePct != null ? `ON-TIME ARR ${s.onTimePct}%` : ''
     },
     setMoment(location, dateTime) {
       q('#mDate').textContent = location
@@ -90,10 +92,10 @@ const HUD_HTML = `
 </div>
 
 <div id="rail">
-  <div class="chip" style="text-align:right"><div class="sv" id="sMiles">—</div><div class="sl">NAUTICAL MILES</div></div>
+  <div class="chip" style="text-align:right"><div class="sv" id="sMiles">—</div><div class="sl">NAUTICAL MILES</div><div class="sl" id="sMilesSub" style="margin-top:3px"></div></div>
   <div class="chip" style="text-align:right"><div class="sv" id="sApts">—</div><div class="sl">AIRPORTS</div></div>
   <div class="chip" style="text-align:right"><div class="sv" id="sCountries">—</div><div class="sl">COUNTRIES</div></div>
-  <div class="chip" style="text-align:right"><div class="sv" id="sHours">—</div><div class="sl">BLOCK HOURS</div></div>
+  <div class="chip" style="text-align:right"><div class="sv" id="sHours">—</div><div class="sl">BLOCK HOURS</div><div class="sl" id="sOnTime" style="margin-top:3px"></div></div>
 </div>
 
 <div id="moment">
