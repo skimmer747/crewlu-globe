@@ -1,4 +1,5 @@
 import type { Trip } from './trips'
+import type { Leg } from '../model'
 
 /** Last = most recent trip already started (fallback: final trip). Next = first upcoming. */
 export function resolveShareTrips(trips: Trip[], now: number): { last: Trip | null; next: Trip | null } {
@@ -58,4 +59,16 @@ export function pickTripSpeedIndex(legCount: number, speeds: number[], baseLegMs
   const alt = best + 1
   if (alt < speeds.length && Math.abs(legCount * (baseLegMs / speeds[alt]) - target) === bestErr) best = alt
   return best
+}
+
+export interface TripCardStats { route: string; nm: number; legs: number; blockHours: number }
+
+/** Card figures for one trip, over operated (non-deadhead) legs. */
+export function tripCardStats(trip: Trip): TripCardStats {
+  let nm = 0, blockMs = 0, legs = 0
+  for (const l of trip.legs as Leg[]) {
+    if (l.dh) continue
+    nm += l.miles; blockMs += l.blockMs; legs++
+  }
+  return { route: tripRoute(trip), nm: Math.round(nm), legs, blockHours: Math.round((blockMs / 3.6e6) * 10) / 10 }
 }

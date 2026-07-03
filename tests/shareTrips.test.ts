@@ -78,3 +78,21 @@ describe('pickTripSpeedIndex', () => {
     }
   })
 })
+
+import { tripCardStats } from '../src/data/shareTrips'
+
+describe('tripCardStats', () => {
+  it('sums flown miles + block hours over operated legs and counts flown legs', () => {
+    const legs: Leg[] = [
+      { ...leg('SDF', 'ANC', 0), miles: 2000, blockMs: 5 * 3.6e6, dh: false },
+      { ...leg('ANC', 'HKG', 1), miles: 4200, blockMs: 9.5 * 3.6e6, dh: false },
+      { ...leg('HKG', 'HKG', 2), miles: 100, blockMs: 3.6e6, dh: true },
+    ]
+    const t = trip('w', 0, legs)
+    const s = tripCardStats(t)
+    expect(s.route).toBe('SDF→ANC→HKG')
+    expect(s.nm).toBe(6200)
+    expect(s.legs).toBe(2)
+    expect(s.blockHours).toBeCloseTo(14.5, 1)
+  })
+})
