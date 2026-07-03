@@ -359,7 +359,10 @@ async function run() {
     const savedSpeedIdx = dock.state.speedIndex
     const hostW = host.clientWidth, hostH = host.clientHeight
     win.start = trip.legs[0].t; win.end = trip.legs[trip.legs.length - 1].t
-    playhead = win.start; dock.state.speedIndex = speedIdx
+    // Start the playhead a hair before the first departure so the FIRST leg animates too.
+    // splitAtPlayhead is inclusive (l.t <= playhead), so playhead == firstLeg.t would count
+    // leg 0 as already-flown and playback would begin at leg 1, skipping its flight.
+    playhead = win.start - 1; dock.state.speedIndex = speedIdx
     playback.setSpeed(SPEEDS[speedIdx])
     draw(true)
 
