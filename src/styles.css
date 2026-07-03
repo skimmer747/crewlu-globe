@@ -161,3 +161,16 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
 .wrow:hover{color:#ffd778}
 .wrow b{color:#eaf7ff;font-weight:600}
 .wrow.spotted{color:#ffd778}
+.sharepanel { margin-top: 8px; width: 260px; padding: 12px; background: rgba(11,32,51,0.92);
+  border: 1px solid rgba(47,214,255,0.35); border-radius: 12px; pointer-events: auto; }
+.sharehdr { font: 600 12px ui-monospace, Menlo, monospace; color: #3fd8ff; letter-spacing: 1.5px; margin-bottom: 10px; }
+.sharebtn { display: block; width: 100%; text-align: left; margin: 0 0 8px; padding: 8px 12px;
+  background: #0d2a3d; border: 1px solid #1d4a64; border-radius: 9px; cursor: pointer; }
+.sharebtn:hover:not(:disabled) { border-color: #2fd6ff; }
+.sharebtn:disabled { opacity: 0.4; cursor: default; }
+.sharekick { display: block; font: 600 10px ui-monospace, Menlo, monospace; color: #7fb8d4; letter-spacing: 1px; }
+.sharelbl { display: block; font: 500 13px ui-monospace, Menlo, monospace; color: #eaf7ff; margin-top: 2px; }
+.sharelink { display: inline-block; margin-top: 4px; font: 400 12px ui-monospace, Menlo, monospace; color: #6f97ad; cursor: pointer; text-decoration: underline; }
+.shareprog { margin: 4px 0 10px; }
+.shareprog > #shareProgBar { height: 4px; width: 0; background: #2fd6ff; border-radius: 2px; transition: width 0.2s; }
+.shareprog > #shareProgTxt { margin-top: 6px; font: 600 10px ui-monospace, Menlo, monospace; color: #3fd8ff; letter-spacing: 1px; }

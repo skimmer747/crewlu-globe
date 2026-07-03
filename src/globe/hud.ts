@@ -26,7 +26,12 @@ export interface Hud {
   onRecords(cb: () => void): void
   onFleet(cb: () => void): void
   onPanelSpot(cb: (el: HTMLElement) => void): void
-  onShare(cb: () => void): void
+  onShareOpen(cb: () => void): void
+  onShareTrip(cb: (which: 'last' | 'next') => void): void
+  onShareImage(cb: () => void): void
+  setShareTrips(last: string | null, next: string | null): void
+  setShareProgress(pct: number): void
+  closeSharePanel(): void
   onCenterTap(cb: () => void): void
   onLunarToggle(cb: () => void): void
   setLunarActive(active: boolean): void
@@ -101,7 +106,35 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
       clearTimeout(evTimer)
       evTimer = window.setTimeout(() => el.classList.remove('show'), 3000)
     },
-    onShare(cb) { q('#shareBtn').addEventListener('click', cb) },
+    onShareOpen(cb) {
+      q('#shareBtn').addEventListener('click', () => {
+        const p = q<HTMLElement>('#sharePanel')
+        const open = p.style.display !== 'none'
+        p.style.display = open ? 'none' : 'block'
+        if (!open) cb()
+      })
+    },
+    onShareTrip(cb) {
+      q('#shareLast').addEventListener('click', () => cb('last'))
+      q('#shareNext').addEventListener('click', () => cb('next'))
+    },
+    onShareImage(cb) { q('#shareImage').addEventListener('click', cb) },
+    setShareTrips(last, next) {
+      const lb = q<HTMLButtonElement>('#shareLast'), nb = q<HTMLButtonElement>('#shareNext')
+      q('#shareLastLbl').textContent = last ?? 'none yet'
+      q('#shareNextLbl').textContent = next ?? 'none scheduled'
+      lb.disabled = last == null; nb.disabled = next == null
+    },
+    setShareProgress(pct) {
+      const wrap = q<HTMLElement>('#shareProg')
+      if (pct <= 0 || pct >= 1) { wrap.style.display = 'none' }
+      else {
+        wrap.style.display = 'block'
+        q<HTMLElement>('#shareProgBar').style.width = `${Math.round(pct * 100)}%`
+        q('#shareProgTxt').textContent = `RENDERING ${Math.round(pct * 100)}%`
+      }
+    },
+    closeSharePanel() { q<HTMLElement>('#sharePanel').style.display = 'none'; q<HTMLElement>('#shareProg').style.display = 'none' },
     onCenterTap(cb) { moment.addEventListener('click', cb) },
     onLunarToggle(cb) { q('#lunarBtn').addEventListener('click', cb) },
     setLunarActive(active) { q('#lunarBtn').classList.toggle('on', active); q<HTMLElement>('#lunarReadout').style.display = active ? 'block' : 'none' },
@@ -127,6 +160,13 @@ const HUD_HTML = `
 <div id="lunar" class="hud" style="top:74px;left:52px;pointer-events:auto">
   <button id="lunarBtn" class="navbtn">◓ LUNAR RETURN</button>
   <button id="shareBtn" class="navbtn" style="margin-left:8px">⇪ SHARE</button>
+  <div id="sharePanel" class="sharepanel" style="display:none">
+    <div class="sharehdr">SHARE A TRIP</div>
+    <button id="shareLast" class="sharebtn"><span class="sharekick">◀ LAST TRIP</span><span id="shareLastLbl" class="sharelbl">—</span></button>
+    <button id="shareNext" class="sharebtn"><span class="sharekick">NEXT TRIP ▶</span><span id="shareNextLbl" class="sharelbl">—</span></button>
+    <div id="shareProg" class="shareprog" style="display:none"><div id="shareProgBar"></div><div id="shareProgTxt">RENDERING 0%</div></div>
+    <a id="shareImage" class="sharelink">Just the current view (image)</a>
+  </div>
   <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
     <button id="allTimeBtn" class="navbtn">★ ALL TIME</button>
     <button id="recordsBtn" class="navbtn">⛁ RECORDS</button>

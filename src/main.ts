@@ -24,7 +24,9 @@ import { sunElevationDeg } from './astro/sun'
 import { demoFlights } from './data/demoFlights'
 import { parseDeepLink } from './globe/deeplink'
 import { recordsFor, milestonesFor, fleetStats, EARTH_LAP_NM } from './data/career'
-import { composeShareCard } from './globe/shareCard'
+import { composeShareCard, composeTripCard } from './globe/shareCard'
+import { resolveShareTrips, tripLabel, tripCardStats, pickTripSpeedIndex } from './data/shareTrips'
+import { recordTripVideo, canRecordVideo } from './globe/tripVideo'
 
 const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
 const fmt = (ms: number) => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2,'0')} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
@@ -304,29 +306,84 @@ async function run() {
     prevElev = elev
   }
 
-  // Share: composite the live frame + stats into a 1200x630 card and hand it to the OS
-  // share sheet (download fallback). preserveDrawingBuffer makes the canvas readable.
-  hud.onShare(() => {
+  // ---- Share: interactive trip video (falls back to a still image) ----
+  const shareTrips = resolveShareTrips(trips, now)
+  hud.onShareOpen(() => hud.setShareTrips(
+    shareTrips.last ? tripLabel(shareTrips.last) : null,
+    shareTrips.next ? tripLabel(shareTrips.next) : null,
+  ))
+
+  const glCanvas = () => host.querySelector('canvas') as HTMLCanvasElement
+
+  const shareOrDownload = async (blob: Blob, filename: string, title: string) => {
+    const file = new File([blob], filename, { type: blob.type })
+    const nav: any = navigator
+    if (nav.share && nav.canShare?.({ files: [file] })) {
+      try { await nav.share({ files: [file], title }) } catch { /* dismissed */ }
+    } else {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+      a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+    }
+  }
+
+  const lunarLineFor = (miles: number) =>
+    `${Math.round(miles).toLocaleString()} NM FLOWN · ${lunarReturns(miles).toFixed(2)} LUNAR RETURNS`
+
+  // The "just the image" secondary link keeps the original career-card behaviour.
+  hud.onShareImage(() => {
     if (!lastStats) return
-    const glCanvas = host.querySelector('canvas')
-    if (!glCanvas) return
-    const laps = lunarReturns(currentMiles)
-    const card = composeShareCard(glCanvas as HTMLCanvasElement, lastStats,
-      `${Math.round(currentMiles).toLocaleString()} NM FLOWN · ${laps.toFixed(2)} LUNAR RETURNS`)
-    card.toBlob(async (blob) => {
-      if (!blob) return
-      const file = new File([blob], 'crewlu-globe.jpg', { type: 'image/jpeg' })
-      const nav: any = navigator
-      if (nav.share && nav.canShare?.({ files: [file] })) {
-        try { await nav.share({ files: [file], title: 'My CrewLu Flight Globe' }) } catch { /* user dismissed */ }
-      } else {
-        const a = document.createElement('a')
-        a.href = URL.createObjectURL(blob)
-        a.download = 'crewlu-globe.jpg'
-        a.click()
-        setTimeout(() => URL.revokeObjectURL(a.href), 5000)
-      }
-    }, 'image/jpeg', 0.9)
+    const card = composeShareCard(glCanvas(), lastStats, lunarLineFor(currentMiles))
+    card.toBlob((b) => { if (b) shareOrDownload(b, 'crewlu-globe.jpg', 'My CrewLu Flight Globe') }, 'image/jpeg', 0.9)
+    hud.closeSharePanel()
+  })
+
+  let recording = false
+  hud.onShareTrip(async (which) => {
+    if (recording) return
+    const trip = which === 'last' ? shareTrips.last : shareTrips.next
+    if (!trip) return
+    recording = true
+
+    const cardStats = tripCardStats(trip)
+    const legCount = cardStats.legs || trip.legs.length
+    const speedIdx = pickTripSpeedIndex(legCount, SPEEDS, 1200)
+    const flightMs = legCount * (1200 / SPEEDS[speedIdx])
+    const card = composeTripCard(glCanvas(), cardStats, lunarLineFor(cardStats.nm))
+
+    if (!canRecordVideo()) {
+      card.toBlob((b) => { if (b) shareOrDownload(b, 'crewlu-trip.jpg', `My ${cardStats.route} trip`) }, 'image/jpeg', 0.9)
+      hud.closeSharePanel(); recording = false; return
+    }
+
+    const savedStart = win.start, savedEnd = win.end, savedPlayhead = playhead
+    const savedSpeedIdx = dock.state.speedIndex
+    const hostW = host.clientWidth, hostH = host.clientHeight
+    win.start = trip.legs[0].t; win.end = trip.legs[trip.legs.length - 1].t
+    playhead = win.start; dock.state.speedIndex = speedIdx
+    playback.setSpeed(SPEEDS[speedIdx])
+    draw(true)
+
+    scene.globe.renderer().setSize(1920, 1080, false)
+    scene.globe.postProcessingComposer().setSize(1920, 1080)
+    scene.globe.camera().aspect = 16 / 9; scene.globe.camera().updateProjectionMatrix()
+
+    try {
+      const blob = await recordTripVideo({
+        gl: glCanvas(), width: 1920, height: 1080, fps: 30, flightMs, outroMs: 2000,
+        play: () => playback.play(), stop: () => playback.pause(),
+        drawOutro: (ctx, w, h) => ctx.drawImage(card, 0, 0, w, h),
+        onProgress: (p) => hud.setShareProgress(p),
+      })
+      await shareOrDownload(blob, 'crewlu-trip.webm', `My ${cardStats.route} trip`)
+    } finally {
+      scene.globe.width(hostW).height(hostH)
+      scene.globe.postProcessingComposer().setSize(hostW, hostH)
+      scene.globe.camera().aspect = hostW / hostH; scene.globe.camera().updateProjectionMatrix()
+      win.start = savedStart; win.end = savedEnd; playhead = savedPlayhead
+      dock.state.speedIndex = savedSpeedIdx; playback.setSpeed(SPEEDS[savedSpeedIdx])
+      playback.pause(); draw(true)
+      hud.setShareProgress(0); hud.closeSharePanel(); recording = false
+    }
   })
 
   // Milestone toasts: playhead sweeping past a career crossing fires the golden event chip.
