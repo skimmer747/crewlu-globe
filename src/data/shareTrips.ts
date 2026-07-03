@@ -32,3 +32,30 @@ export function tripRoute(trip: Trip): string {
   }
   return stops.join('→')
 }
+
+export const VIDEO_FLOOR_MS = 6000
+export const VIDEO_CEIL_MS = 18000
+const PER_LEG_TARGET_MS = 1000
+
+/** Total on-screen flight time for `legCount` legs at SPEEDS[i]. */
+export function tripFlightMs(legCount: number, speeds: number[], baseLegMs: number, i = pickTripSpeedIndex(legCount, speeds, baseLegMs)): number {
+  return legCount * (baseLegMs / speeds[i])
+}
+
+/**
+ * Choose the SPEEDS index whose total flight time is closest to a clamped target
+ * (≈1s per leg, floored/ceiled so short trips linger and epic trips stay shareable).
+ * Ties break toward the faster speed (shorter, snappier clip).
+ */
+export function pickTripSpeedIndex(legCount: number, speeds: number[], baseLegMs: number): number {
+  const target = Math.min(VIDEO_CEIL_MS, Math.max(VIDEO_FLOOR_MS, legCount * PER_LEG_TARGET_MS))
+  let best = 0, bestErr = Infinity
+  for (let i = 0; i < speeds.length; i++) {
+    const total = legCount * (baseLegMs / speeds[i])
+    const err = Math.abs(total - target)
+    if (err < bestErr - 1e-6) { bestErr = err; best = i }
+  }
+  const alt = best + 1
+  if (alt < speeds.length && Math.abs(legCount * (baseLegMs / speeds[alt]) - target) === bestErr) best = alt
+  return best
+}

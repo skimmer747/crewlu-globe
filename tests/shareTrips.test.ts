@@ -44,3 +44,37 @@ describe('tripLabel', () => {
     expect(tripLabel(t)).toBe('Jul 9 · SDF→CGN→SDF')
   })
 })
+
+import { pickTripSpeedIndex, tripFlightMs, VIDEO_FLOOR_MS, VIDEO_CEIL_MS } from '../src/data/shareTrips'
+
+const SPEEDS = [0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3, 4]
+const BASE_LEG_MS = 1200
+
+describe('pickTripSpeedIndex', () => {
+  it('returns a valid index into SPEEDS', () => {
+    const i = pickTripSpeedIndex(4, SPEEDS, BASE_LEG_MS)
+    expect(i).toBeGreaterThanOrEqual(0)
+    expect(i).toBeLessThan(SPEEDS.length)
+  })
+  it('a 15-leg trip runs at least as fast as a 2-leg trip (higher speed index)', () => {
+    expect(pickTripSpeedIndex(15, SPEEDS, BASE_LEG_MS)).toBeGreaterThanOrEqual(pickTripSpeedIndex(2, SPEEDS, BASE_LEG_MS))
+  })
+  it('chooses the speed closest to the clamped ~1s/leg target', () => {
+    const target = (n: number) => Math.min(VIDEO_CEIL_MS, Math.max(VIDEO_FLOOR_MS, n * 1000))
+    for (const n of [1, 2, 5, 15, 25, 40]) {
+      const i = pickTripSpeedIndex(n, SPEEDS, BASE_LEG_MS)
+      const chosenErr = Math.abs(n * (BASE_LEG_MS / SPEEDS[i]) - target(n))
+      for (let j = 0; j < SPEEDS.length; j++) {
+        const altErr = Math.abs(n * (BASE_LEG_MS / SPEEDS[j]) - target(n))
+        expect(chosenErr).toBeLessThanOrEqual(altErr + 1e-6)
+      }
+    }
+  })
+  it('keeps realistic trips (<=20 legs) within a shareable ~3-20s flight window', () => {
+    for (let n = 1; n <= 20; n++) {
+      const ms = tripFlightMs(n, SPEEDS, BASE_LEG_MS)
+      expect(ms).toBeGreaterThanOrEqual(3000)
+      expect(ms).toBeLessThanOrEqual(20000)
+    }
+  })
+})
