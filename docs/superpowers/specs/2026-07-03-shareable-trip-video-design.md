@@ -75,6 +75,16 @@ frames = `(flightMs + outroMs) × fps / 1000` (varies, ~240–600).
 
 ## 6. Architecture
 
+> **Amendment (2026-07-03, during planning):** Reading the code showed the dart flight
+> (`dart.flyLeg`/`tick`) and camera moves run on `performance.now()` wall-clock tweens, so the
+> animation is **not** a pure function of an internal clock. True offline frame-stepping would
+> mean reimplementing dart/camera/contrail as clock-injectable — too big for v1. The
+> implementation plan therefore uses **real-time capture at a forced 1080p backing store**
+> (record the live animation via `captureStream` + `MediaRecorder`, blitted onto a 16:9 stage
+> canvas, card outro appended). Same high-res result; it records in real time. The offline
+> frame-step idea below is kept for reference / a possible later upgrade. See
+> `docs/superpowers/plans/2026-07-03-shareable-trip-video.md`.
+
 New module `src/globe/tripVideo.ts`, roughly:
 
 ```ts
