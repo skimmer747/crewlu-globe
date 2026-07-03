@@ -31,6 +31,7 @@ Data facts this plan relies on (already in the codebase):
 - `SPEEDS = [0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3, 4]` (`src/globe/timelineDock.ts`); playback `baseLegMs = 1200` (`src/main.ts`), so a leg takes `1200 / SPEEDS[i]` ms.
 - `lunarReturns(miles)` (`src/globe/lunarTrajectory.ts`).
 - The live share handler at `src/main.ts:307-330`; globe built with `preserveDrawingBuffer: true` (`src/globe/globeScene.ts:30`), exposing `globe.renderer()`, `globe.camera()`, `globe.scene()`, `globe.postProcessingComposer()`, `globe.width()/height()`.
+- **Tests live in `tests/`, not colocated** (correction applied during execution): Vitest `include` is `tests/**/*.test.ts`, and existing tests import sources via `../src/...`. So the test file below is `tests/shareTrips.test.ts` with imports `../src/data/shareTrips`, `../src/data/trips`, `../src/model` — despite the `src/data/*.test.ts` paths written in Tasks 2–4.
 
 **Verification harness for browser tasks:** run `npm run dev` and open the printed URL with `?demo=1` (demo mode always has past trips **and** one future "ghost" trip, so both Last and Next are exercisable without Supabase). Use the preview MCP tools (`preview_start`, `preview_console_logs`, `preview_screenshot`) to drive and observe.
 
@@ -259,12 +260,22 @@ describe('pickTripSpeedIndex', () => {
   it('a 15-leg trip runs at least as fast as a 2-leg trip (higher speed index)', () => {
     expect(pickTripSpeedIndex(15, SPEEDS, BASE_LEG_MS)).toBeGreaterThanOrEqual(pickTripSpeedIndex(2, SPEEDS, BASE_LEG_MS))
   })
-  it('keeps total flight time within [floor, ceil] as closely as the discrete speeds allow', () => {
+  it('chooses the speed closest to the clamped ~1s/leg target', () => {
+    const target = (n: number) => Math.min(VIDEO_CEIL_MS, Math.max(VIDEO_FLOOR_MS, n * 1000))
     for (const n of [1, 2, 5, 15, 25, 40]) {
+      const i = pickTripSpeedIndex(n, SPEEDS, BASE_LEG_MS)
+      const chosenErr = Math.abs(n * (BASE_LEG_MS / SPEEDS[i]) - target(n))
+      for (let j = 0; j < SPEEDS.length; j++) {
+        const altErr = Math.abs(n * (BASE_LEG_MS / SPEEDS[j]) - target(n))
+        expect(chosenErr).toBeLessThanOrEqual(altErr + 1e-6)
+      }
+    }
+  })
+  it('keeps realistic trips (<=20 legs) within a shareable ~3-20s flight window', () => {
+    for (let n = 1; n <= 20; n++) {
       const ms = tripFlightMs(n, SPEEDS, BASE_LEG_MS)
-      // never wildly past the ceiling; never a blink well under the floor unless legs are truly few
-      expect(ms).toBeLessThanOrEqual(VIDEO_CEIL_MS + BASE_LEG_MS / SPEEDS[SPEEDS.length - 1])
-      expect(ms).toBeGreaterThan(2000)
+      expect(ms).toBeGreaterThanOrEqual(3000)
+      expect(ms).toBeLessThanOrEqual(20000)
     }
   })
 })
