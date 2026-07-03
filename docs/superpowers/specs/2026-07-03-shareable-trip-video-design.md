@@ -50,18 +50,28 @@ Trip labels: `date` = `trip.start` formatted; `route` = `from→…→to`. Both 
 - Reuse the split already encoded in `schedule.ts` (`focusTrip` / `beaconHome` do the same
   `t <= now` / `t > now` comparison) rather than reinventing it.
 
-## 5. Video composition (the ~10s clip)
+## 5. Video composition (length scales with the trip)
 
-- **0:00 – ~0:08** — the selected trip animates exactly as the live playback already renders
+- **Flight phase** — the selected trip animates exactly as the live playback already renders
   it, but scoped to this trip's legs: dart flies each leg (`onFly`), contrail trails, legs
   reveal (`onReveal`), and the day/night terminator + sky sweep via
   `onPlayhead(playheadForSample(...))`.
-- **~0:08 – 0:10** — ease to rest, then hold on the trip-stats card for the final ~60 frames.
-- 30 fps → ~300 frames → ~10s.
+- **Outro phase** — ease to rest, then hold on the trip-stats card for ~2s (~60 frames at 30fps).
 
-**Pacing:** choose `legMs` so the trip's legs fill ~8s regardless of leg count
-(`legMs ≈ 8000 / legCount`, clamped to a sane min/max), with dwell only at sub-trip
-boundaries (a single trip usually has none). Reuse `buildPlaybackSchedule`.
+**Pacing — scale length to the trip, within limits.** A 2-leg turn and a 15-leg world tour
+must not be the same length. Give each flown leg a base on-screen duration, then clamp the
+*total* flight time so every clip stays watchable and shareable:
+
+- `flightMs = clamp(legCount × PER_LEG, FLOOR, CEIL)`; `legMs = flightMs / legCount`.
+- Defaults (tune after seeing real output): `PER_LEG ≈ 1000ms`, `FLOOR ≈ 6000ms`,
+  `CEIL ≈ 18000ms`; plus the ~2s card outro.
+- Examples: 2-leg turn → ~6s flying (each leg lingers ~3s) + 2s ≈ **8s**; 15-leg world tour →
+  ~15s flying + 2s ≈ **17s**; 25-leg trip → capped ~18s (legs speed up) + 2s ≈ **20s**.
+
+Reuse `buildPlaybackSchedule` with the derived `legMs`. Because the terminator sweeps during
+each airborne span, long-haul trips (longer flights, more legs) naturally roll through many
+more day/night cycles than a short turn — the big trip *feels* big beyond its length. Total
+frames = `(flightMs + outroMs) × fps / 1000` (varies, ~240–600).
 
 ## 6. Architecture
 
@@ -158,8 +168,9 @@ Extend `src/globe/shareCard.ts`:
 ## 10. Verification
 
 - Demo mode (`?demo=1`) always has trips including one future → exercises both Last and Next.
-- Desktop Chrome: create a clip → a ~10s 1920×1080 WebM downloads/plays; flight animates then
-  holds on the trip card; all displayed numbers are rounded.
+- Desktop Chrome: create a clip → a 1920×1080 WebM whose length scales with the trip
+  (~8–20s) downloads/plays; flight animates then holds on the trip card; all displayed numbers
+  are rounded. Check a short turn (~8s) and a long/world trip (~17s) both feel right.
 - Confirm capture still relies on `preserveDrawingBuffer: true` (already set for the card).
 - iOS Safari / unsupported: confirm graceful fallback to the trip-stats image — no dead-end,
   no thrown errors.
@@ -174,5 +185,8 @@ Extend `src/globe/shareCard.ts`:
   `videoBitsPerSecond` for 1080p.
 - Frame pacing with manual `captureStream(0)` + `requestFrame()` — how the yield between
   frames maps to encoded frame timestamps/duration so the clip runs at true 30 fps (spike).
-- `legMs` min/max clamps for very short (1–2 leg) vs long (world-tour) trips.
+- Final `PER_LEG` / `FLOOR` / `CEIL` pacing values — dial in against real trips after first output.
 - Deadhead handling in the trip-stats card (count/label flown vs rode).
+- For multi-day trips, whether to advance the day/night clock during ground time between
+  flights (compressed) so the calendar span reads more, or keep the live behavior (clock moves
+  only during airborne spans). v1 = live behavior.
