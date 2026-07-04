@@ -72,3 +72,38 @@ export function tripCardStats(trip: Trip): TripCardStats {
   }
   return { route: tripRoute(trip), nm: Math.round(nm), legs, blockHours: Math.round((blockMs / 3.6e6) * 10) / 10 }
 }
+
+/**
+ * The trip whose span contains `ph`, or null. Landing-aware: matches [first departure, last-leg
+ * LANDING] — not trip.end, which is only the last leg's departure. Without this a scrub over an
+ * in-progress final leg would report "no trip", exactly when you'd want to grab it.
+ */
+export function getTripAtPlayhead(trips: Trip[], ph: number): Trip | null {
+  for (const t of trips) {
+    const last = t.legs[t.legs.length - 1] as Leg | undefined
+    const landing = last ? last.landing : t.end
+    if (ph >= t.start && ph <= landing) return t
+  }
+  return null
+}
+
+/**
+ * Trips around the timeline playhead. When the playhead is on a trip, `last`/`next` are the trips
+ * immediately before/after it, so the three are always distinct. In a layover gap, `last` is the
+ * most recently departed trip and `next` the first upcoming — with no fall-back to the final trip,
+ * so scrubbing before your first (or after your last) flight honestly yields null. Assumes `trips`
+ * is sorted by start (groupIntoTrips guarantees this).
+ */
+export function resolveTimelineTrips(trips: Trip[], ph: number): { last: Trip | null; current: Trip | null; next: Trip | null } {
+  const current = getTripAtPlayhead(trips, ph)
+  if (current) {
+    const i = trips.indexOf(current)
+    return { last: i > 0 ? trips[i - 1] : null, current, next: i < trips.length - 1 ? trips[i + 1] : null }
+  }
+  let last: Trip | null = null, next: Trip | null = null
+  for (const t of trips) {
+    if (t.start <= ph) last = t
+    else { next = t; break }
+  }
+  return { last, current: null, next }
+}

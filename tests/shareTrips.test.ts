@@ -96,3 +96,57 @@ describe('tripCardStats', () => {
     expect(s.blockHours).toBeCloseTo(14.5, 1)
   })
 })
+
+import { resolveTimelineTrips, getTripAtPlayhead } from '../src/data/shareTrips'
+
+// Trips with tight, explicit landing times (the default helper lands legs at t + 1h).
+const legAt = (from: string, to: string, t: number, land: number): Leg => ({ ...leg(from, to, t), landing: land })
+const TA = trip('A', 100, [legAt('AA', 'AB', 100, 140), legAt('AB', 'AC', 150, 190)]) // start 100, end(dep) 150, lands 190
+const TB = trip('B', 300, [legAt('BA', 'BB', 300, 340), legAt('BB', 'BC', 350, 390)]) // start 300, end(dep) 350, lands 390
+const TC = trip('C', 500, [legAt('CA', 'CB', 500, 540)])                               // start 500, end(dep) 500, lands 540
+const TRIPS = [TA, TB, TC]
+
+describe('getTripAtPlayhead (landing-aware)', () => {
+  it('matches across [start, last-leg landing], not just departures', () => {
+    expect(getTripAtPlayhead(TRIPS, 160)?.id).toBe('A') // past last-leg departure (150), still in the air (lands 190)
+    expect(getTripAtPlayhead(TRIPS, 190)?.id).toBe('A') // exactly at landing
+    expect(getTripAtPlayhead(TRIPS, 191)).toBeNull()    // just after landing
+    expect(getTripAtPlayhead(TRIPS, 99)).toBeNull()     // just before departure
+  })
+})
+
+describe('resolveTimelineTrips', () => {
+  it('current is landing-aware; last/next straddle it', () => {
+    const r = resolveTimelineTrips(TRIPS, 160)
+    expect(r.current?.id).toBe('A')
+    expect(r.last).toBeNull() // A is the first trip
+    expect(r.next?.id).toBe('B')
+  })
+  it('on a middle trip, last/next name the neighbours (three distinct trips)', () => {
+    const r = resolveTimelineTrips(TRIPS, 350)
+    expect(r.last?.id).toBe('A')
+    expect(r.current?.id).toBe('B')
+    expect(r.next?.id).toBe('C')
+  })
+  it('in a layover gap: no current; last/next straddle the gap', () => {
+    const r = resolveTimelineTrips(TRIPS, 250)
+    expect(r.current).toBeNull()
+    expect(r.last?.id).toBe('A')
+    expect(r.next?.id).toBe('B')
+  })
+  it('before the first trip: last is null (no fallback), next is the first trip', () => {
+    const r = resolveTimelineTrips(TRIPS, 50)
+    expect(r.last).toBeNull()
+    expect(r.current).toBeNull()
+    expect(r.next?.id).toBe('A')
+  })
+  it('after the last trip: next is null (no fallback), last is the final trip', () => {
+    const r = resolveTimelineTrips(TRIPS, 1000)
+    expect(r.last?.id).toBe('C')
+    expect(r.current).toBeNull()
+    expect(r.next).toBeNull()
+  })
+  it('empty input yields all nulls', () => {
+    expect(resolveTimelineTrips([], 100)).toEqual({ last: null, current: null, next: null })
+  })
+})
