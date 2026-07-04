@@ -265,6 +265,10 @@ async function run() {
   // Camera zoom tracks leg length: short hops zoom way in, long hauls pull out (lower altitude = closer).
   const altForLeg = (miles: number) => Math.min(2.6, Math.max(0.6, 0.6 + miles * 0.00033))
 
+  // Video record overrides each leg's fly duration so the dart + camera stay exactly in step
+  // with the (off-grid, slowed) schedule; null = the live SPEEDS-based pace.
+  let legFlyDur: number | null = null
+
   const playback = createPlayback({
     legs: () => legsInWindow(legs, { start: win.start, end: win.end }),
     trips: () => trips,
@@ -273,7 +277,7 @@ async function run() {
     baseDwellMs: 500,
     onReveal: () => { /* arcs are rebuilt by draw() when solid-count changes */ },
     onFly: (leg) => {
-      const dur = Math.max(200, 1200 / SPEEDS[dock.state.speedIndex])
+      const dur = Math.max(200, legFlyDur ?? 1200 / SPEEDS[dock.state.speedIndex])
       activeLegId = leg.id // paint this leg's arc green while it flies
       beacon.flyLeg(leg, dur)
       dart.flyLeg(leg, dur) // the 3D dart rides the same leg, in sync
@@ -398,11 +402,10 @@ async function run() {
     // Cinematic pacing: run the video at 80% of the auto-picked speed (≈20% slower).
     const VIDEO_SLOWDOWN = 1.25
     const speed = SPEEDS[pickTripSpeedIndex(legCount, SPEEDS, 1200)] / VIDEO_SLOWDOWN
-    const flightMs = legCount * (1200 / speed)
-    // Camera follows via the dock speed index; pick the nearest real SPEEDS entry to `speed`
-    // so the per-leg camera move roughly tracks the (now slower) flight time.
-    let camIdx = 0
-    for (let i = 1; i < SPEEDS.length; i++) if (Math.abs(SPEEDS[i] - speed) < Math.abs(SPEEDS[camIdx] - speed)) camIdx = i
+    const legMs = 1200 / speed
+    // Record a short beat past the last landing so the final leg fully arrives and the globe
+    // settles before we cut to the stats card (otherwise the end of the trip looks clipped).
+    const flightMs = legCount * legMs + 600
     const card = composeTripCard(glCanvas(), cardStats, lunarLineFor(cardStats.nm))
 
     if (!canRecordVideo()) {
@@ -417,7 +420,8 @@ async function run() {
     // Start the playhead a hair before the first departure so the FIRST leg animates too.
     // splitAtPlayhead is inclusive (l.t <= playhead), so playhead == firstLeg.t would count
     // leg 0 as already-flown and playback would begin at leg 1, skipping its flight.
-    playhead = win.start - 1; dock.state.speedIndex = camIdx
+    playhead = win.start - 1
+    legFlyDur = legMs // dart + camera fly each leg in exact step with the slowed schedule
     playback.setSpeed(speed)
     draw(true)
 
@@ -442,6 +446,7 @@ async function run() {
       e.textContent = 'Recording failed on this browser (see console).'
       hud.setShareResult(e)
     } finally {
+      legFlyDur = null
       scene.globe.width(hostW).height(hostH)
       scene.globe.postProcessingComposer().setSize(hostW, hostH)
       scene.globe.camera().aspect = hostW / hostH; scene.globe.camera().updateProjectionMatrix()
