@@ -31,6 +31,7 @@ export interface Hud {
   onShareImage(cb: () => void): void
   setShareTrips(last: string | null, next: string | null): void
   setShareProgress(pct: number): void
+  setShareResult(node: HTMLElement | null): void
   closeSharePanel(): void
   onCenterTap(cb: () => void): void
   onLunarToggle(cb: () => void): void
@@ -134,7 +135,16 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
         q('#shareProgTxt').textContent = `RENDERING ${Math.round(pct * 100)}%`
       }
     },
-    closeSharePanel() { q<HTMLElement>('#sharePanel').style.display = 'none'; q<HTMLElement>('#shareProg').style.display = 'none' },
+    setShareResult(node) {
+      const r = q<HTMLElement>('#shareResult')
+      r.innerHTML = ''
+      if (node) { r.appendChild(node); r.style.display = 'block' } else { r.style.display = 'none' }
+    },
+    closeSharePanel() {
+      q<HTMLElement>('#sharePanel').style.display = 'none'
+      q<HTMLElement>('#shareProg').style.display = 'none'
+      const r = q<HTMLElement>('#shareResult'); r.style.display = 'none'; r.innerHTML = ''
+    },
     onCenterTap(cb) { moment.addEventListener('click', cb) },
     onLunarToggle(cb) { q('#lunarBtn').addEventListener('click', cb) },
     setLunarActive(active) { q('#lunarBtn').classList.toggle('on', active); q<HTMLElement>('#lunarReadout').style.display = active ? 'block' : 'none' },
@@ -165,6 +175,7 @@ const HUD_HTML = `
     <button id="shareLast" class="sharebtn"><span class="sharekick">◀ LAST TRIP</span><span id="shareLastLbl" class="sharelbl">—</span></button>
     <button id="shareNext" class="sharebtn"><span class="sharekick">NEXT TRIP ▶</span><span id="shareNextLbl" class="sharelbl">—</span></button>
     <div id="shareProg" class="shareprog" style="display:none"><div id="shareProgBar"></div><div id="shareProgTxt">RENDERING 0%</div></div>
+    <div id="shareResult" style="display:none;margin:4px 0 10px"></div>
     <a id="shareImage" class="sharelink">Just the current view (image)</a>
   </div>
   <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">

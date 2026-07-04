@@ -329,6 +329,54 @@ async function run() {
   const lunarLineFor = (miles: number) =>
     `${Math.round(miles).toLocaleString()} NM FLOWN · ${lunarReturns(miles).toFixed(2)} LUNAR RETURNS`
 
+  // Present the finished clip inline (preview + explicit Save/Share). We do NOT auto-fire the
+  // save: navigator.share and programmatic downloads need a live user activation, which the
+  // long (~10-20s) render has already consumed — so the user taps Save/Share within a fresh
+  // gesture. Showing the <video> also lets us SEE whether capture worked (empty => diagnostics).
+  let lastVideoUrl: string | null = null
+  const presentTripVideo = (blob: Blob, filename: string, route: string) => {
+    console.log('[share] recorded', blob.type, blob.size, 'bytes')
+    if (lastVideoUrl) { URL.revokeObjectURL(lastVideoUrl); lastVideoUrl = null }
+    const box = document.createElement('div')
+    if (!blob.size) {
+      const e = document.createElement('div')
+      e.style.cssText = 'font:600 10px ui-monospace,Menlo,monospace;letter-spacing:1px;color:#ff9f6f'
+      e.textContent = "Recording came out empty on this browser — tell me and I'll switch capture modes."
+      box.appendChild(e); hud.setShareResult(box); return
+    }
+    const url = URL.createObjectURL(blob); lastVideoUrl = url
+    const kb = blob.size / 1024
+    const sizeLabel = kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.round(kb)} KB`
+
+    const vid = document.createElement('video')
+    vid.src = url; vid.controls = true; vid.autoplay = true; vid.muted = true; vid.loop = true
+    ;(vid as any).playsInline = true
+    vid.style.cssText = 'width:100%;border-radius:8px;display:block;background:#04111f'
+    box.appendChild(vid)
+
+    const meta = document.createElement('div')
+    meta.style.cssText = 'margin-top:6px;font:600 10px ui-monospace,Menlo,monospace;letter-spacing:1px;color:#7fb8d4'
+    meta.textContent = `${route} · ${sizeLabel}`
+    box.appendChild(meta)
+
+    const btn = 'display:block;width:100%;text-align:center;margin-top:8px;padding:9px 12px;border-radius:9px;font:700 12px ui-monospace,Menlo,monospace;letter-spacing:1px;cursor:pointer;text-decoration:none'
+    const dl = document.createElement('a')
+    dl.href = url; dl.download = filename; dl.textContent = '⤓ SAVE VIDEO'
+    dl.style.cssText = `${btn};background:#103a2a;border:1px solid #2f7d55;color:#7dffb0`
+    box.appendChild(dl)
+
+    const file = new File([blob], filename, { type: blob.type })
+    const nav: any = navigator
+    if (nav.canShare?.({ files: [file] })) {
+      const sh = document.createElement('button')
+      sh.textContent = '⇪ SHARE'
+      sh.style.cssText = `${btn};margin-top:6px;background:#0d2a3d;border:1px solid #2fd6ff;color:#7fdcff`
+      sh.addEventListener('click', async () => { try { await nav.share({ files: [file], title: `My ${route} trip` }) } catch { /* dismissed */ } })
+      box.appendChild(sh)
+    }
+    hud.setShareResult(box)
+  }
+
   // The "just the image" secondary link keeps the original career-card behaviour.
   hud.onShareImage(() => {
     if (!lastStats) return
@@ -343,6 +391,7 @@ async function run() {
     const trip = which === 'last' ? shareTrips.last : shareTrips.next
     if (!trip) return
     recording = true
+    hud.setShareResult(null)
 
     const cardStats = tripCardStats(trip)
     const legCount = cardStats.legs || trip.legs.length
@@ -377,7 +426,15 @@ async function run() {
         drawOutro: (ctx, w, h) => ctx.drawImage(card, 0, 0, w, h),
         onProgress: (p) => hud.setShareProgress(p),
       })
-      await shareOrDownload(blob, 'crewlu-trip.webm', `My ${cardStats.route} trip`)
+      hud.setShareProgress(0)
+      presentTripVideo(blob, `crewlu-trip.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`, cardStats.route)
+    } catch (err) {
+      console.error('[share] recording failed', err)
+      hud.setShareProgress(0)
+      const e = document.createElement('div')
+      e.style.cssText = 'font:600 10px ui-monospace,Menlo,monospace;letter-spacing:1px;color:#ff9f6f'
+      e.textContent = 'Recording failed on this browser (see console).'
+      hud.setShareResult(e)
     } finally {
       scene.globe.width(hostW).height(hostH)
       scene.globe.postProcessingComposer().setSize(hostW, hostH)
@@ -385,7 +442,7 @@ async function run() {
       win.start = savedStart; win.end = savedEnd; playhead = savedPlayhead
       dock.state.speedIndex = savedSpeedIdx; playback.setSpeed(SPEEDS[savedSpeedIdx])
       playback.pause(); draw(true)
-      hud.setShareProgress(0); hud.closeSharePanel(); recording = false
+      recording = false
     }
   })
 
