@@ -395,8 +395,8 @@ async function run() {
 
     const cardStats = tripCardStats(trip)
     const legCount = cardStats.legs || trip.legs.length
-    // Cinematic pacing: take the auto-picked speed and slow it ~80% for the video.
-    const VIDEO_SLOWDOWN = 5
+    // Cinematic pacing: run the video at 80% of the auto-picked speed (≈20% slower).
+    const VIDEO_SLOWDOWN = 1.25
     const speed = SPEEDS[pickTripSpeedIndex(legCount, SPEEDS, 1200)] / VIDEO_SLOWDOWN
     const flightMs = legCount * (1200 / speed)
     // Camera follows via the dock speed index; pick the nearest real SPEEDS entry to `speed`
