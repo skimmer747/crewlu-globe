@@ -25,7 +25,7 @@ import { demoFlights } from './data/demoFlights'
 import { parseDeepLink } from './globe/deeplink'
 import { recordsFor, milestonesFor, fleetStats, EARTH_LAP_NM } from './data/career'
 import { composeShareCard, composeTripCard } from './globe/shareCard'
-import { resolveShareTrips, tripLabel, tripCardStats, pickTripSpeedIndex } from './data/shareTrips'
+import { resolveShareTrips, tripLabel, tripCardStats } from './data/shareTrips'
 import { recordTripVideo, canRecordVideo } from './globe/tripVideo'
 
 const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
@@ -399,12 +399,12 @@ async function run() {
 
     const cardStats = tripCardStats(trip)
     const legCount = cardStats.legs || trip.legs.length
-    // Cinematic pacing: run the video at 80% of the auto-picked speed (≈20% slower).
-    const VIDEO_SLOWDOWN = 1.25
-    const speed = SPEEDS[pickTripSpeedIndex(legCount, SPEEDS, 1200)] / VIDEO_SLOWDOWN
-    const legMs = 1200 / speed
-    // Record a short beat past the last landing so the final leg fully arrives and the globe
-    // settles before we cut to the stats card (otherwise the end of the trip looks clipped).
+    // Aim for a ~60s video: split the minute evenly across the flights, with a per-leg floor so
+    // a huge trip stays watchable. Bump TRIP_VIDEO_TARGET_MS to make every clip longer/shorter.
+    const TRIP_VIDEO_TARGET_MS = 60000
+    const legMs = Math.max(1800, (TRIP_VIDEO_TARGET_MS - 2600) / legCount) // 2000 outro + 600 arrival hold
+    const speed = 1200 / legMs
+    // Record a short beat past the last landing so the final leg fully arrives before the card.
     const flightMs = legCount * legMs + 600
     const card = composeTripCard(glCanvas(), cardStats, lunarLineFor(cardStats.nm))
 
