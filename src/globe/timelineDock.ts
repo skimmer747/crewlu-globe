@@ -19,6 +19,7 @@ export interface TimelineDock {
   state: DockState
   onWindowChange(cb: (start: number, end: number) => void): void
   onSeek(cb: (ms: number) => void): void
+  onScrub(cb: (ms: number) => void): void // fires live during a playhead drag (onSeek only fires on release)
   onPlayToggle(cb: () => void): void
   onSpeed(cb: (mult: number) => void): void
 }
@@ -53,6 +54,7 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
   let track!: HTMLElement
   let cbWindow: (s: number, e: number) => void = () => {}
   let cbSeek: (ms: number) => void = () => {}
+  let cbScrub: (ms: number) => void = () => {}
   let cbToggle: () => void = () => {}
   let cbSpeed: (m: number) => void = () => {}
 
@@ -170,6 +172,7 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
       const cx = clamp01((clamp01(rawF) - INSET) / BAND)
       state.playhead = Math.min(Math.max(axis.xToDate(cx), state.windowStart), state.windowEnd)
       renderTrack()
+      cbScrub(state.playhead)
     }
 
     // Inward push: the edge jumps to the date under the finger on the FIXED base scale.
@@ -305,6 +308,7 @@ export function createTimelineDock(init: { legs: Leg[]; trips: Trip[]; windowSta
     setMomentTrip() { /* moment chip is owned by the HUD; dock exposes window/playhead only */ },
     onWindowChange(cb) { cbWindow = cb },
     onSeek(cb) { cbSeek = cb },
+    onScrub(cb) { cbScrub = cb },
     onPlayToggle(cb) { cbToggle = cb },
     onSpeed(cb) { cbSpeed = cb },
   }

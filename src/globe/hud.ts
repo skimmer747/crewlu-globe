@@ -27,11 +27,12 @@ export interface Hud {
   onFleet(cb: () => void): void
   onPanelSpot(cb: (el: HTMLElement) => void): void
   onShareOpen(cb: () => void): void
-  onShareTrip(cb: (which: 'last' | 'next') => void): void
+  onShareTrip(cb: (which: 'last' | 'this' | 'next') => void): void
   onShareImage(cb: () => void): void
-  setShareTrips(last: string | null, next: string | null): void
+  setShareTrips(last: string | null, current: string | null, next: string | null): void
   setShareProgress(pct: number): void
   setShareResult(node: HTMLElement | null): void
+  isSharePanelOpen(): boolean
   closeSharePanel(): void
   onCenterTap(cb: () => void): void
   onLunarToggle(cb: () => void): void
@@ -117,14 +118,18 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
     },
     onShareTrip(cb) {
       q('#shareLast').addEventListener('click', () => cb('last'))
+      q('#shareThis').addEventListener('click', () => cb('this'))
       q('#shareNext').addEventListener('click', () => cb('next'))
     },
     onShareImage(cb) { q('#shareImage').addEventListener('click', cb) },
-    setShareTrips(last, next) {
+    setShareTrips(last, current, next) {
       const lb = q<HTMLButtonElement>('#shareLast'), nb = q<HTMLButtonElement>('#shareNext')
       q('#shareLastLbl').textContent = last ?? 'none yet'
       q('#shareNextLbl').textContent = next ?? 'none scheduled'
       lb.disabled = last == null; nb.disabled = next == null
+      const tb = q<HTMLElement>('#shareThis')
+      if (current == null) { tb.style.display = 'none' }
+      else { tb.style.display = 'block'; q('#shareThisLbl').textContent = current }
     },
     setShareProgress(pct) {
       const wrap = q<HTMLElement>('#shareProg')
@@ -140,6 +145,7 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
       r.innerHTML = ''
       if (node) { r.appendChild(node); r.style.display = 'block' } else { r.style.display = 'none' }
     },
+    isSharePanelOpen() { return q<HTMLElement>('#sharePanel').style.display !== 'none' },
     closeSharePanel() {
       q<HTMLElement>('#sharePanel').style.display = 'none'
       q<HTMLElement>('#shareProg').style.display = 'none'
@@ -173,6 +179,7 @@ const HUD_HTML = `
   <div id="sharePanel" class="sharepanel" style="display:none">
     <div class="sharehdr">SHARE A TRIP</div>
     <button id="shareLast" class="sharebtn"><span class="sharekick">◀ LAST TRIP</span><span id="shareLastLbl" class="sharelbl">—</span></button>
+    <button id="shareThis" class="sharebtn" style="display:none"><span class="sharekick">▸ THIS TRIP</span><span id="shareThisLbl" class="sharelbl">—</span></button>
     <button id="shareNext" class="sharebtn"><span class="sharekick">NEXT TRIP ▶</span><span id="shareNextLbl" class="sharelbl">—</span></button>
     <div id="shareProg" class="shareprog" style="display:none"><div id="shareProgBar"></div><div id="shareProgTxt">RENDERING 0%</div></div>
     <div id="shareResult" style="display:none;margin:4px 0 10px"></div>

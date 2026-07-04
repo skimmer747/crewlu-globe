@@ -25,7 +25,7 @@ import { demoFlights } from './data/demoFlights'
 import { parseDeepLink } from './globe/deeplink'
 import { recordsFor, milestonesFor, fleetStats, EARTH_LAP_NM } from './data/career'
 import { composeShareCard, composeTripCard } from './globe/shareCard'
-import { resolveShareTrips, tripLabel, tripCardStats } from './data/shareTrips'
+import { resolveTimelineTrips, tripLabel, tripCardStats } from './data/shareTrips'
 import { recordTripVideo, canRecordVideo } from './globe/tripVideo'
 
 const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
@@ -285,7 +285,7 @@ async function run() {
       // camera follows the plane to its arrival, zoomed to the leg's length
       scene.globe.pointOfView({ lat: leg.e[0], lng: leg.e[1], altitude: altForLeg(leg.miles) }, dur)
     },
-    onPlayhead: (ms) => { checkMilestones(playhead, ms); playhead = ms; dock.setPlayhead(ms); draw(false); checkGoldenHour(ms) },
+    onPlayhead: (ms) => { checkMilestones(playhead, ms); playhead = ms; dock.setPlayhead(ms); draw(false); checkGoldenHour(ms); refreshShareLabels() },
     onDone: () => { activeLegId = null; dock.setPlaying(false); draw() },
     onPlayingChange: (p) => { dock.setPlaying(p); if (p) scene.globe.controls().autoRotate = false; else { activeLegId = null; dart.stop(); beacon.halt() } draw() },
   })
@@ -311,11 +311,22 @@ async function run() {
   }
 
   // ---- Share: interactive trip video (falls back to a still image) ----
-  const shareTrips = resolveShareTrips(trips, now)
-  hud.onShareOpen(() => hud.setShareTrips(
-    shareTrips.last ? tripLabel(shareTrips.last) : null,
-    shareTrips.next ? tripLabel(shareTrips.next) : null,
-  ))
+  // The panel's trip buttons track the timeline playhead, resolved live as you scrub or play.
+  // shareSel holds the current resolution; onShareTrip snapshots the chosen Trip at click time.
+  let recording = false
+  let shareSel: ReturnType<typeof resolveTimelineTrips> = { last: null, current: null, next: null }
+  const shareIds = { last: '', current: '', next: '' }
+  const refreshShareLabels = () => {
+    if (recording || !hud.isSharePanelOpen()) return // no churn when closed or mid-record
+    const r = resolveTimelineTrips(trips, dock.state.playhead)
+    const ids = { last: r.last?.id ?? '', current: r.current?.id ?? '', next: r.next?.id ?? '' }
+    if (ids.last === shareIds.last && ids.current === shareIds.current && ids.next === shareIds.next) return // no boundary crossed
+    Object.assign(shareIds, ids); shareSel = r
+    hud.setShareTrips(r.last ? tripLabel(r.last) : null, r.current ? tripLabel(r.current) : null, r.next ? tripLabel(r.next) : null)
+  }
+  // Repaint on open (bust the change-detect cache), then track scrubbing live.
+  hud.onShareOpen(() => { shareIds.last = shareIds.current = shareIds.next = '\x00'; refreshShareLabels() })
+  dock.onScrub(refreshShareLabels)
 
   const glCanvas = () => host.querySelector('canvas') as HTMLCanvasElement
 
@@ -389,10 +400,9 @@ async function run() {
     hud.closeSharePanel()
   })
 
-  let recording = false
   hud.onShareTrip(async (which) => {
     if (recording) return
-    const trip = which === 'last' ? shareTrips.last : shareTrips.next
+    const trip = which === 'last' ? shareSel.last : which === 'this' ? shareSel.current : shareSel.next
     if (!trip) return
     recording = true
     hud.setShareResult(null)
