@@ -399,10 +399,12 @@ async function run() {
 
     const cardStats = tripCardStats(trip)
     const legCount = cardStats.legs || trip.legs.length
-    // Aim for a ~60s video: split the minute evenly across the flights, with a per-leg floor so
-    // a huge trip stays watchable. Bump TRIP_VIDEO_TARGET_MS to make every clip longer/shorter.
-    const TRIP_VIDEO_TARGET_MS = 60000
-    const legMs = Math.max(1800, (TRIP_VIDEO_TARGET_MS - 2600) / legCount) // 2000 outro + 600 arrival hold
+    // Length scales with the trip: each flight gets ~3s of screen time, but the whole clip is
+    // capped at 60s (a long line compresses to fit rather than dragging). Short trips stay short.
+    // VIDEO_PER_LEG_MS is the pace knob; VIDEO_MAX_TOTAL_MS the ceiling.
+    const VIDEO_PER_LEG_MS = 3000
+    const VIDEO_MAX_TOTAL_MS = 60000
+    const legMs = Math.min(VIDEO_PER_LEG_MS, (VIDEO_MAX_TOTAL_MS - 2600) / legCount) // 2000 outro + 600 hold
     const speed = 1200 / legMs
     // Record a short beat past the last landing so the final leg fully arrives before the card.
     const flightMs = legCount * legMs + 600
