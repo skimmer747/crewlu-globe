@@ -398,7 +398,7 @@ async function run() {
     hud.setShareResult(null)
 
     const cardStats = tripCardStats(trip)
-    const legCount = cardStats.legs || trip.legs.length
+    const legCount = trip.legs.length // count EVERY leg the playback animates (incl. deadheads), so the recording spans the whole trip — cardStats.legs (flown only) undercounts and clips the end
     // Length scales with the trip: each flight gets ~3s of screen time, but the whole clip is
     // capped at 60s (a long line compresses to fit rather than dragging). Short trips stay short.
     // VIDEO_PER_LEG_MS is the pace knob; VIDEO_MAX_TOTAL_MS the ceiling.
