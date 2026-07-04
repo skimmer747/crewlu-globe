@@ -395,8 +395,14 @@ async function run() {
 
     const cardStats = tripCardStats(trip)
     const legCount = cardStats.legs || trip.legs.length
-    const speedIdx = pickTripSpeedIndex(legCount, SPEEDS, 1200)
-    const flightMs = legCount * (1200 / SPEEDS[speedIdx])
+    // Cinematic pacing: take the auto-picked speed and slow it ~80% for the video.
+    const VIDEO_SLOWDOWN = 5
+    const speed = SPEEDS[pickTripSpeedIndex(legCount, SPEEDS, 1200)] / VIDEO_SLOWDOWN
+    const flightMs = legCount * (1200 / speed)
+    // Camera follows via the dock speed index; pick the nearest real SPEEDS entry to `speed`
+    // so the per-leg camera move roughly tracks the (now slower) flight time.
+    let camIdx = 0
+    for (let i = 1; i < SPEEDS.length; i++) if (Math.abs(SPEEDS[i] - speed) < Math.abs(SPEEDS[camIdx] - speed)) camIdx = i
     const card = composeTripCard(glCanvas(), cardStats, lunarLineFor(cardStats.nm))
 
     if (!canRecordVideo()) {
@@ -411,8 +417,8 @@ async function run() {
     // Start the playhead a hair before the first departure so the FIRST leg animates too.
     // splitAtPlayhead is inclusive (l.t <= playhead), so playhead == firstLeg.t would count
     // leg 0 as already-flown and playback would begin at leg 1, skipping its flight.
-    playhead = win.start - 1; dock.state.speedIndex = speedIdx
-    playback.setSpeed(SPEEDS[speedIdx])
+    playhead = win.start - 1; dock.state.speedIndex = camIdx
+    playback.setSpeed(speed)
     draw(true)
 
     scene.globe.renderer().setSize(1920, 1080, false)
