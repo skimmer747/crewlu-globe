@@ -25,6 +25,7 @@ export interface TripVideoOpts {
   play: () => void
   stop: () => void
   drawOutro: (ctx: CanvasRenderingContext2D, w: number, h: number) => void
+  drawOverlay?: (ctx: CanvasRenderingContext2D, w: number, h: number) => void // drawn over each flight frame (From→To etc.)
   onProgress?: (pct: number) => void
 }
 
@@ -54,7 +55,7 @@ export async function recordTripVideo(o: TripVideoOpts): Promise<Blob> {
   await new Promise<void>((resolve) => {
     const frame = () => {
       const elapsed = performance.now() - t0
-      if (elapsed < o.flightMs) blit()
+      if (elapsed < o.flightMs) { blit(); o.drawOverlay?.(ctx, o.width, o.height) }
       else o.drawOutro(ctx, o.width, o.height)
       o.onProgress?.(Math.min(0.99, elapsed / total))
       if (elapsed >= total) resolve()

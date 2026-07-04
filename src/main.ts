@@ -436,6 +436,21 @@ async function run() {
         gl: glCanvas(), width: 1920, height: 1080, fps: 30, flightMs, outroMs: 2000,
         play: () => playback.play(), stop: () => playback.pause(),
         drawOutro: (ctx, w, h) => ctx.drawImage(card, 0, 0, w, h),
+        drawOverlay: (ctx, w, h) => {
+          ctx.textBaseline = 'alphabetic'
+          ctx.font = '700 34px ui-monospace, Menlo, monospace'
+          ctx.fillStyle = '#eaf7ff'; ctx.fillText('CREWLU', 64, 92)
+          ctx.fillStyle = '#2fd6ff'; ctx.fillText(' · FLIGHT GLOBE', 64 + ctx.measureText('CREWLU').width, 92)
+          const leg = activeLegId ? legs.find((l) => l.id === activeLegId) : null
+          if (!leg) return
+          const grad = ctx.createLinearGradient(0, h - 190, 0, h)
+          grad.addColorStop(0, 'rgba(4,17,31,0)'); grad.addColorStop(1, 'rgba(4,17,31,0.72)')
+          ctx.fillStyle = grad; ctx.fillRect(0, h - 190, w, 190)
+          ctx.fillStyle = '#eaf7ff'; ctx.font = '700 78px ui-monospace, Menlo, monospace'
+          ctx.fillText(`${leg.from} → ${leg.to}`, 64, h - 84)
+          ctx.fillStyle = '#7fb8d4'; ctx.font = '600 30px ui-monospace, Menlo, monospace'
+          ctx.fillText(fmtDateTime(playhead), 64, h - 42)
+        },
         onProgress: (p) => hud.setShareProgress(p),
       })
       hud.setShareProgress(0)
