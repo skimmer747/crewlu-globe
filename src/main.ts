@@ -395,7 +395,8 @@ async function run() {
     const btn = 'display:block;width:100%;text-align:center;margin-top:8px;padding:9px 12px;border-radius:9px;font:700 12px ui-monospace,Menlo,monospace;letter-spacing:1px;cursor:pointer;text-decoration:none'
     const dl = document.createElement('a')
     dl.href = url; dl.download = filename; dl.textContent = '⤓ SAVE VIDEO'
-    dl.style.cssText = `${btn};background:#103a2a;border:1px solid #2f7d55;color:#7dffb0`
+    // Narrower than the shared full-width btn base: shrink SAVE VIDEO to its label, centered. (SAVE VIDEO only.)
+    dl.style.cssText = `${btn};background:#103a2a;border:1px solid #2f7d55;color:#7dffb0;width:fit-content;margin-left:auto;margin-right:auto`
     box.appendChild(dl)
 
     const file = new File([blob], filename, { type: blob.type })
