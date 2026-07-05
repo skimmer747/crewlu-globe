@@ -15,6 +15,7 @@ import { configureArcs, setArcs, configurePointClick } from './globe/arcsLayer'
 import { createMoonLayer } from './globe/moonLayer'
 import { createBeaconLayer } from './globe/beaconLayer'
 import { createDartLayer } from './globe/dartLayer'
+import { createCityLabels } from './globe/cityLabels'
 import { createHud } from './globe/hud'
 import { createTimelineDock, SPEEDS } from './globe/timelineDock'
 import { createPlayback } from './globe/playback'
@@ -86,12 +87,17 @@ async function run() {
   const beacon = createBeaconLayer()
   const dart = createDartLayer()
   const sky = createSkyLayer()
+  const cityLabels = createCityLabels()
   const lunar = createLunarTrajectory(scene.globe)
 
   scene.globe
-    .htmlElementsData([...sky.data, moon.datum, beacon.datum])
+    .htmlElementsData([...sky.data, moon.datum, beacon.datum, ...cityLabels.data])
     .htmlLat((d: any) => d.lat).htmlLng((d: any) => d.lng).htmlAltitude((d: any) => d.alt)
-    .htmlElement((d: any) => (d.type === 'sky' ? sky.elementFor(d.id) : d.type === 'beacon' ? beacon.el : moon.el))
+    // Snap HTML elements to their exact positions. We re-feed this layer every frame and drive
+    // positions imperatively (beacon, moon, city labels); three-globe's default 1000ms position
+    // tween makes fixed-point labels lag ~1s behind and float away during camera pans / leg changes.
+    .htmlTransitionDuration(0)
+    .htmlElement((d: any) => (d.type === 'sky' ? sky.elementFor(d.id) : d.type === 'beacon' ? beacon.el : d.type === 'cityLabel' ? cityLabels.elementFor(d.id) : moon.el))
   beacon.setContrailSink(scene.globe)
   dart.attach(scene.globe)
 
@@ -211,6 +217,7 @@ async function run() {
     if (t <= prev.in) return { latlng: prev.e, label: `${prev.to} · TAXI IN` } // landed, rolling to the gate
     return { latlng: prev.e, label: prev.to } // parked
   }
+  const cityOf = (iata: string) => airports.lookup(iata)?.city ?? iata
 
   // Arc rebuilds are gated on the solid-count OR the active (in-flight) leg changing.
   // The cheap per-frame updates always run.
@@ -250,11 +257,15 @@ async function run() {
     scene.setSun(new Date(playhead))
     moon.update(new Date(playhead))
     sky.update(new Date(playhead))
-    scene.globe.htmlElementsData([...sky.data, moon.datum, beacon.datum])
-    applyOcclusion()
     // During playback show the flying leg's full route; when scrubbing/paused fall back to the
     // exact position (route in the air, city on the ground).
     const active = activeLegId ? legs.find((l) => l.id === activeLegId) : null
+    cityLabels.setLegs(
+      active ? { lat: active.s[0], lng: active.s[1], text: cityOf(active.from) } : null,
+      active ? { lat: active.e[0], lng: active.e[1], text: cityOf(active.to) } : null,
+    )
+    scene.globe.htmlElementsData([...sky.data, moon.datum, beacon.datum, ...cityLabels.data])
+    applyOcclusion()
     hud.setMoment(active ? `${active.from} → ${active.to}` : positionAt(playhead).label, fmtDateTime(playhead))
     if (lunarOn) refreshLunar(false) // keep the lunar line + readout in sync with the timeline
   }

@@ -35,6 +35,10 @@ body { margin: 0; background: #03050b; color: #eaf7ff; font-family: ui-monospace
 .sky-planet{border-radius:50%}
 .sky-label{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:5px;font-size:9px;letter-spacing:1.5px;color:#cfe6ff;white-space:nowrap;text-shadow:0 0 4px #000,0 0 8px #000}
 
+/* ── City labels (departure/arrival, anchored under the airport point) ──────── */
+.city-label-wrap{position:relative;width:0;height:0;pointer-events:none}
+.city-label{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:7px;font-size:10px;font-weight:700;letter-spacing:.5px;color:#eaf7ff;white-space:nowrap;text-shadow:0 0 4px #000,0 0 8px #000}
+
 /* ── HUD chrome ──────────────────────────────────────────────────────────── */
 #stars{position:absolute;inset:-8%;opacity:.7;transition:transform .25s ease-out;will-change:transform;background-image:
     radial-gradient(1.3px 1.3px at 8% 16%,#fff,transparent),radial-gradient(1px 1px at 18% 62%,#cfe6ff,transparent),
