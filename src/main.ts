@@ -102,6 +102,13 @@ async function run() {
     onSignOut: demo
       ? () => { window.open('https://crewlu.net', '_blank', 'noopener') }
       : async () => { await supabase.auth.signOut(); location.reload() },
+    onSignIn: demo
+      ? () => {
+          const url = new URL(location.href)
+          url.searchParams.delete('demo')
+          location.href = url.toString()
+        }
+      : undefined,
   })
   // Occlude DOM sky bodies (Moon, Sun, planets) behind the Earth as the camera moves:
   // big bodies get the limb-clip; tiny ones (planets) just hide when behind.
