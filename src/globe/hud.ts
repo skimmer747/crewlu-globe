@@ -124,12 +124,13 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
     onShareImage(cb) { q('#shareImage').addEventListener('click', cb) },
     setShareTrips(last, current, next) {
       const lb = q<HTMLButtonElement>('#shareLast'), nb = q<HTMLButtonElement>('#shareNext')
-      q('#shareLastLbl').textContent = last ?? 'none yet'
-      q('#shareNextLbl').textContent = next ?? 'none scheduled'
+      const wrap = (s: string) => s.replace(/→/g, '→​') // zero-width break so long routes wrap between airports
+      q('#shareLastLbl').textContent = last ? wrap(last) : 'none yet'
+      q('#shareNextLbl').textContent = next ? wrap(next) : 'none scheduled'
       lb.disabled = last == null; nb.disabled = next == null
       const tb = q<HTMLElement>('#shareThis')
       if (current == null) { tb.style.display = 'none' }
-      else { tb.style.display = 'block'; q('#shareThisLbl').textContent = current }
+      else { tb.style.display = 'block'; q('#shareThisLbl').textContent = wrap(current) }
     },
     setShareProgress(pct) {
       const wrap = q<HTMLElement>('#shareProg')

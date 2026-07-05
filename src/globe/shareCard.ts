@@ -88,7 +88,12 @@ export function composeTripCard(
   const w1 = ctx.measureText('CREWLU').width
   ctx.fillStyle = '#2fd6ff'; ctx.fillText(' · FLIGHT GLOBE', 64 + w1, H - 190)
 
-  ctx.fillStyle = '#eaf7ff'; ctx.font = '700 60px ui-monospace, Menlo, monospace'
+  ctx.fillStyle = '#eaf7ff'
+  let routeSize = 60 // shrink the route to fit the card width so long multi-stop trips don't overflow
+  ctx.font = `700 ${routeSize}px ui-monospace, Menlo, monospace`
+  while (routeSize > 26 && ctx.measureText(card.route).width > W - 128) {
+    routeSize -= 2; ctx.font = `700 ${routeSize}px ui-monospace, Menlo, monospace`
+  }
   ctx.fillText(card.route, 64, H - 120)
 
   const stat = (label: string, value: string, x: number) => {
