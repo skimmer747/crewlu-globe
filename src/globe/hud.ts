@@ -41,7 +41,7 @@ export interface Hud {
   starfield: HTMLElement
 }
 
-export function createHud(host: HTMLElement, opts?: { account?: string; onSignOut?: () => void }): Hud {
+export function createHud(host: HTMLElement, opts?: { account?: string; onSignOut?: () => void; onSignIn?: () => void }): Hud {
   host.insertAdjacentHTML('beforeend', HUD_HTML)
   const q = <T extends HTMLElement>(s: string) => host.querySelector<T>(s)!
   const moment = q<HTMLDivElement>('#momentChip')
@@ -54,6 +54,12 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
     accountEl.style.cursor = 'pointer'
     accountEl.title = 'Sign out'
     accountEl.addEventListener('click', opts.onSignOut)
+  }
+
+  const signInEl = q<HTMLButtonElement>('#signInBtn')
+  if (opts?.onSignIn) {
+    signInEl.style.display = 'inline-block'
+    signInEl.addEventListener('click', opts.onSignIn)
   }
 
   const cityChip = q<HTMLDivElement>('#cityChip')
@@ -168,7 +174,10 @@ const HUD_HTML = `
 <div class="tick tick-b" style="right:16px;border-bottom:1.6px solid;border-right:1.6px solid"></div>
 
 <div class="hud" style="top:24px;left:52px;font-size:14px;font-weight:700;color:#eaf7ff">CREWLU<span style="color:#2fd6ff"> ·</span> FLIGHT&nbsp;GLOBE</div>
-<div id="account" class="hud" style="top:25px;right:50px">Signed in</div>
+<div style="position:absolute;top:22px;right:50px;display:flex;align-items:center;gap:10px;z-index:5;pointer-events:none">
+  <button id="signInBtn" class="navbtn" style="display:none">→ SIGN IN</button>
+  <div id="account" class="hud" style="position:static">Signed in</div>
+</div>
 <div class="hud" style="top:50px;left:52px;display:flex;gap:18px;font-size:9px;letter-spacing:1px">
   <span><span style="display:inline-block;width:18px;height:2px;background:#5fe0ff;vertical-align:middle;margin-right:6px;box-shadow:0 0 6px #5fe0ff"></span>FLEW</span>
   <span><span style="display:inline-block;width:18px;height:2px;background:#ffb15f;vertical-align:middle;margin-right:6px;box-shadow:0 0 6px #ffb15f"></span>DEADHEAD</span>
