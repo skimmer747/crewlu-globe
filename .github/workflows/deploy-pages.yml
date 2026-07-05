@@ -38,7 +38,16 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # This repo's Pages backend chronically returns "Deployment failed, try again later" on the
+    # first attempt but succeeds on a retry — so try up to 3 times before failing the run.
     steps:
-      - id: deployment
+      - id: a1
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - id: a2
+        if: steps.a1.outcome != 'success'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - id: a3
+        if: steps.a1.outcome != 'success' && steps.a2.outcome != 'success'
         uses: actions/deploy-pages@v4
