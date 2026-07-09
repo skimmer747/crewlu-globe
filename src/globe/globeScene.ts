@@ -9,6 +9,7 @@ export interface GlobeScene {
   setSun(date: Date): void
   cameraPos(): { x: number; y: number; z: number }
   onCameraChange(cb: () => void): void
+  refreshView(): void // re-sync view-dependent shader uniforms after direct camera moves
 }
 
 export function createGlobeScene(host: HTMLElement, viewport: HTMLElement): GlobeScene {
@@ -82,5 +83,6 @@ export function createGlobeScene(host: HTMLElement, viewport: HTMLElement): Glob
     setSun(date) { const s = subsolarPoint(date); material.uniforms.sunPosition.value.set(s.lng, s.lat) },
     cameraPos() { const p = globe.camera().position; return { x: p.x, y: p.y, z: p.z } },
     onCameraChange(cb) { ctr.addEventListener('change', cb) },
+    refreshView() { const pov = globe.pointOfView(); material.uniforms.globeRotation.value.set(pov.lng, pov.lat); maybeLoadHiRes() },
   }
 }

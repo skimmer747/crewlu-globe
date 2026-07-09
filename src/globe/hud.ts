@@ -38,6 +38,9 @@ export interface Hud {
   onLunarToggle(cb: () => void): void
   setLunarActive(active: boolean): void
   setLunarReadout(text: string): void
+  onMissionVideo(cb: () => void): void
+  setMissionVideoVisible(on: boolean): void
+  openSharePanel(): void
   starfield: HTMLElement
 }
 
@@ -162,6 +165,9 @@ export function createHud(host: HTMLElement, opts?: { account?: string; onSignOu
     onLunarToggle(cb) { q('#lunarBtn').addEventListener('click', cb) },
     setLunarActive(active) { q('#lunarBtn').classList.toggle('on', active); q<HTMLElement>('#lunarReadout').style.display = active ? 'block' : 'none' },
     setLunarReadout(text) { q('#lunarReadout').textContent = text },
+    onMissionVideo(cb) { q('#lunarVideoBtn').addEventListener('click', cb) },
+    setMissionVideoVisible(on) { q<HTMLElement>('#lunarVideoBtn').style.display = on ? 'inline-block' : 'none' },
+    openSharePanel() { q<HTMLElement>('#sharePanel').style.display = 'block' },
   }
 }
 
@@ -201,6 +207,7 @@ const HUD_HTML = `
     <button id="fleetBtn" class="navbtn">✈ FLEET</button>
   </div>
   <div id="lunarReadout" class="lunartel" style="display:none"></div>
+  <button id="lunarVideoBtn" class="navbtn" style="display:none;margin-top:8px">⬇ SAVE MISSION VIDEO</button>
   <div id="wrapPanel" class="lunartel" style="display:none;pointer-events:auto"></div>
 </div>
 
