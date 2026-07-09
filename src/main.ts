@@ -20,6 +20,8 @@ import { createHud } from './globe/hud'
 import { createTimelineDock, SPEEDS } from './globe/timelineDock'
 import { createPlayback } from './globe/playback'
 import { createLunarTrajectory, buildTrajectoryPoints, lunarReturns, LUNAR_RETURN_NM } from './globe/lunarTrajectory'
+import { createMoonMesh } from './globe/moonMesh'
+import { createLunarCinematic } from './globe/lunarCinematic'
 import { createContrail } from './globe/contrail'
 import { sunElevationDeg } from './astro/sun'
 import { demoFlights } from './data/demoFlights'
@@ -27,7 +29,7 @@ import { parseDeepLink } from './globe/deeplink'
 import { recordsFor, milestonesFor, fleetStats, EARTH_LAP_NM } from './data/career'
 import { composeShareCard, composeTripCard } from './globe/shareCard'
 import { resolveTimelineTrips, tripLabel, tripCardStats } from './data/shareTrips'
-import { recordTripVideo, canRecordVideo } from './globe/tripVideo'
+import { recordTripVideo, recordCanvas, canRecordVideo } from './globe/tripVideo'
 
 const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
 const fmt = (ms: number) => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2,'0')} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` }
@@ -89,6 +91,7 @@ async function run() {
   const sky = createSkyLayer()
   const cityLabels = createCityLabels()
   const lunar = createLunarTrajectory(scene.globe)
+  const moonMesh = createMoonMesh(scene.globe)
 
   scene.globe
     .htmlElementsData([...sky.data, moon.datum, beacon.datum, ...cityLabels.data])
@@ -118,6 +121,7 @@ async function run() {
   })
   // Occlude DOM sky bodies (Moon, Sun, planets) behind the Earth as the camera moves:
   // big bodies get the limb-clip; tiny ones (planets) just hide when behind.
+  let missionFlying = false
   const applyOcclusion = () => {
     const cam = scene.cameraPos()
     // The Moon's on-screen size is locked to a fixed fraction of the Earth's apparent size
@@ -131,10 +135,15 @@ async function run() {
     // Cap of 10 is just a safety ceiling (only reached when Earth fills the whole viewport,
     // where the Moon is off-screen anyway). A lower cap froze the Moon at a fixed size while
     // zoomed in, so it couldn't shrink with Earth until Earth had nearly caught down to it.
-    moon.setScale(Math.min(10, Math.max(0.02, (MOON_EARTH_RATIO * earthRpx) / 23.8))) // 23.8px = rendered disk radius at scale 1
-    // Feather the Moon behind Earth (soft fade across the atmosphere) instead of a hard limb clip,
-    // so it recedes behind the blue glow rather than looking cut out. Mask rides the scaled inner el.
-    featherBehindEarth({ maskEl: moon.scaleEl, boxHalf: 42, scale: moon.scale, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
+    if (missionFlying) {
+      moon.el.style.opacity = '0' // the cinematic's 3D moon owns the sky; hide the DOM overlay (opacity, not display — three-globe owns the wrap's display)
+    } else {
+      moon.el.style.opacity = ''
+      moon.setScale(Math.min(10, Math.max(0.02, (MOON_EARTH_RATIO * earthRpx) / 23.8))) // 23.8px = rendered disk radius at scale 1
+      // Feather the Moon behind Earth (soft fade across the atmosphere) instead of a hard limb clip,
+      // so it recedes behind the blue glow rather than looking cut out. Mask rides the scaled inner el.
+      featherBehindEarth({ maskEl: moon.scaleEl, boxHalf: 42, scale: moon.scale, lat: moon.datum.lat, lng: moon.datum.lng, alt: moon.datum.alt, cam, globe: scene.globe, viewport })
+    }
     for (const b of sky.bodies) {
       if (b.occlude === 'clip') clipBehindEarth({ el: b.el, halfSize: b.halfSize, lat: b.datum.lat, lng: b.datum.lng, alt: b.datum.alt, cam, globe: scene.globe, viewport })
       else b.el.style.opacity = isOccluded(cam, b.datum.lat, b.datum.lng, b.datum.alt) ? '0' : '1'
@@ -142,6 +151,15 @@ async function run() {
     beacon.refreshOcclusion(cam)
   }
   scene.onCameraChange(applyOcclusion)
+  let cineTelem = ''
+  const cine = createLunarCinematic({
+    globe: scene.globe,
+    moonMesh,
+    onFrame: () => { scene.refreshView(); applyOcclusion() },
+    onTelemetry: (t) => { cineTelem = t; hud.setLunarReadout(t) },
+    onEvent: (t) => hud.setEvent(t),
+    setReveal: (f) => lunar.setReveal(f),
+  })
   hud.onCenterTap(() => { scene.globe.controls().autoRotate = false; scene.globe.pointOfView({ lat: beacon.pos.lat, lng: beacon.pos.lng, altitude: 1.7 }, 950) })
 
   configurePointClick(scene.globe, (iata) => {
@@ -169,6 +187,7 @@ async function run() {
   const loop = () => {
     beacon.tick(); dart.tick(); beacon.setVeil(dart.presence())
     const nowMs = performance.now()
+    lunar.tick(nowMs)
     const g = dart.geoPos()
     if (g) contrail.push(g[0], g[1], g[2], nowMs)
     else if (contrail.size()) contrail.decay()
@@ -231,17 +250,19 @@ async function run() {
   let lunarOn = false, revealRaf = 0
   // Rebuild the lunar line + readout from the current miles & Moon position (called on toggle and on every timeline change).
   const refreshLunar = (animate: boolean) => {
+    if (missionFlying) return // the cinematic owns the line, reveal, and readout while flying
     // Orient the swing to face the lunar-return vantage (camera sits at lat 0, lng moonLng+90).
     // Use that deterministic direction rather than the live camera, which is still mid-fly-in.
     const camDir = geoToCartesian(0, moon.datum.lng + 90, 0, 100)
-    lunar.setPath(buildTrajectoryPoints(moon.datum.lat, moon.datum.lng, moon.datum.alt, { cam: camDir }))
+    lunar.setPath(buildTrajectoryPoints(moon.datum.lat, moon.datum.lng, moon.datum.alt, { cam: camDir, start: { lat: beacon.pos.lat, lng: beacon.pos.lng } }))
     const laps = lunarReturns(currentMiles)
     hud.setLunarReadout(`DISTANCE FLOWN  ${Math.round(currentMiles).toLocaleString()} NM\nEARTH–MOON RETURN  ${LUNAR_RETURN_NM.toLocaleString()} NM\n= ${laps.toFixed(2)} LUNAR RETURNS`)
-    const target = Math.min(1, laps)
+    // Full mission always drawn; the gold marker shows how far the career miles have reached.
+    lunar.setMarker(laps >= 0.01 && laps < 1 ? laps : null)
     cancelAnimationFrame(revealRaf)
-    if (!animate) { lunar.setReveal(target); return }
+    if (!animate) { lunar.setReveal(1); return }
     const t0 = performance.now()
-    const step = (ts: number) => { const f = Math.min(1, (ts - t0) / 1600); lunar.setReveal(f * target); if (f < 1) revealRaf = requestAnimationFrame(step) }
+    const step = (ts: number) => { const f = Math.min(1, (ts - t0) / 1600); lunar.setReveal(f); if (f < 1) revealRaf = requestAnimationFrame(step) }
     revealRaf = requestAnimationFrame(step)
   }
   const draw = (full = true) => {
@@ -645,10 +666,38 @@ async function run() {
     draw()
   })
 
-  // Lunar return trajectory: a NASA-style line whose length = the miles flown, drawn Earth → around
-  // the Moon → back. Toggling it pulls the camera into a wide "mission view".
+  // Lunar return: tap flies the full free-return mission (launch from the pilot's position →
+  // around the Moon → home), then settles into the wide mission view with the dashed line and
+  // readout. Reduced-motion keeps the static reveal. Tap again exits, restoring the camera.
   let savedMaxDist = 0, savedPov: any = null
-  hud.onLunarToggle(() => {
+
+  const missionView = (durationMs: number) => {
+    scene.globe.pointOfView({ lat: 0, lng: moon.datum.lng + 90, altitude: 62 }, durationMs)
+    refreshLunar(true)
+  }
+
+  const startMission = async (): Promise<boolean> => {
+    missionFlying = true
+    const camDir = geoToCartesian(0, moon.datum.lng + 90, 0, 100)
+    const traj = buildTrajectoryPoints(moon.datum.lat, moon.datum.lng, moon.datum.alt, { cam: camDir, start: { lat: beacon.pos.lat, lng: beacon.pos.lng } })
+    lunar.setPath(traj)
+    lunar.setReveal(0)
+    const laps = lunarReturns(currentMiles)
+    const fraction = laps >= 0.01 && laps < 1 ? laps : null
+    lunar.setMarker(fraction)
+    const mc = scene.globe.getCoords(moon.datum.lat, moon.datum.lng, moon.datum.alt)
+    moonMesh.show(mc, new Date(playhead))
+    const ok = await cine.play({ traj, moonCenter: mc, milesFraction: fraction })
+    missionFlying = false
+    moonMesh.hide()
+    applyOcclusion()
+    if (!ok || !lunarOn) return false
+    missionView(1400)
+    return true
+  }
+
+  hud.onLunarToggle(async () => {
+    if (recording) return
     lunarOn = !lunarOn
     hud.setLunarActive(lunarOn)
     const ctr = scene.globe.controls()
@@ -656,13 +705,65 @@ async function run() {
       playback.pause()
       savedMaxDist = ctr.maxDistance; savedPov = scene.globe.pointOfView()
       ctr.maxDistance = 9000; ctr.autoRotate = false
-      scene.globe.pointOfView({ lat: 0, lng: moon.datum.lng + 90, altitude: 62 }, 1400)
-      refreshLunar(true)
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        scene.globe.pointOfView({ lat: 0, lng: moon.datum.lng + 90, altitude: 62 }, 1400)
+        refreshLunar(true)
+      } else {
+        const done = await startMission()
+        if (done) hud.setMissionVideoVisible(canRecordVideo())
+      }
     } else {
+      cine.cancel()
       cancelAnimationFrame(revealRaf)
       lunar.hide()
+      hud.setMissionVideoVisible(false)
       ctr.maxDistance = savedMaxDist || 1800
       if (savedPov) scene.globe.pointOfView(savedPov, 1200)
+    }
+  })
+
+  // Save-mission-video: replay the exact cinematic while recording the GL canvas at 1080p —
+  // the DOM HUD never appears in the capture, so telemetry is drawn onto the stage instead.
+  hud.onMissionVideo(async () => {
+    if (recording || !lunarOn || missionFlying) return
+    recording = true
+    hud.openSharePanel()
+    hud.setShareResult(null)
+    const hostW = host.clientWidth, hostH = host.clientHeight
+    scene.globe.renderer().setSize(1920, 1080, false)
+    scene.globe.postProcessingComposer().setSize(1920, 1080)
+    scene.globe.camera().aspect = 16 / 9; scene.globe.camera().updateProjectionMatrix()
+    try {
+      const blob = await recordCanvas({
+        gl: glCanvas(), width: 1920, height: 1080, fps: 30,
+        totalMs: 1050 + cine.totalMs + 1600, // pad fly-in + flight + settle into mission view
+        onStart: () => { void startMission() },
+        drawFrame: (ctx, w, h, _elapsed, blit) => {
+          blit()
+          ctx.textBaseline = 'alphabetic'
+          ctx.font = '700 34px ui-monospace, Menlo, monospace'
+          ctx.fillStyle = '#eaf7ff'; ctx.fillText('CREWLU', 64, 92)
+          ctx.fillStyle = '#2fd6ff'; ctx.fillText(' · LUNAR RETURN', 64 + ctx.measureText('CREWLU').width, 92)
+          ctx.fillStyle = '#9fe6ff'; ctx.font = '600 30px ui-monospace, Menlo, monospace'
+          const lines = cineTelem.split('\n')
+          lines.forEach((ln, i) => ctx.fillText(ln, 64, h - 64 - (lines.length - 1 - i) * 40))
+        },
+        onProgress: (p) => hud.setShareProgress(p),
+      })
+      hud.setShareProgress(0)
+      presentTripVideo(blob, `crewlu-lunar-return.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`, 'LUNAR RETURN')
+    } catch (err) {
+      console.error('[share] mission recording failed', err)
+      hud.setShareProgress(0)
+      const e = document.createElement('div')
+      e.style.cssText = 'font:600 10px ui-monospace,Menlo,monospace;letter-spacing:1px;color:#ff9f6f'
+      e.textContent = 'Recording failed on this browser (see console).'
+      hud.setShareResult(e)
+    } finally {
+      scene.globe.width(hostW).height(hostH)
+      scene.globe.postProcessingComposer().setSize(hostW, hostH)
+      scene.globe.camera().aspect = hostW / hostH; scene.globe.camera().updateProjectionMatrix()
+      recording = false
     }
   })
 
