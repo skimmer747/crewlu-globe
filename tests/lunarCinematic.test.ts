@@ -16,17 +16,17 @@ describe('missionStateAt', () => {
     }
   })
 
-  it('holds near the Moon for the earthrise beat', () => {
-    // 19s–23s of the timeline crawls through the far side (u ≈ 0.499 → 0.505)
-    expect(missionStateAt(19000).u).toBeGreaterThan(0.49)
-    expect(missionStateAt(23000).u).toBeLessThan(0.51)
+  it('crawls the Moon for the near-side + earthrise beats', () => {
+    // 20s–26s of the timeline crawls around the Moon (u ≈ 0.497 → 0.507)
+    expect(missionStateAt(20500).u).toBeGreaterThan(0.49)
+    expect(missionStateAt(25500).u).toBeLessThan(0.51)
   })
 
   it('camera rig stays in sane bounds and ends in chase position', () => {
     for (let t = 0; t <= MISSION_TOTAL_MS; t += 250) {
       const { cam } = missionStateAt(t)
       expect(cam.dist).toBeGreaterThan(10)
-      expect(cam.dist).toBeLessThan(40)
+      expect(cam.dist).toBeLessThan(60)
       expect(cam.theta).toBeGreaterThanOrEqual(0)
       expect(cam.theta).toBeLessThanOrEqual(180)
       expect(cam.rise).toBeGreaterThanOrEqual(0)

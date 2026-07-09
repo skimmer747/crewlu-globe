@@ -48,15 +48,15 @@ interface Beat { dur: number; u1: number; ease: (k: number) => number; cam1: Cam
 // time maps to u through beats: skim/earthrise crawl through that sliver while ascent/return
 // sprint across the empty two-hundred-thousand-mile legs.
 const BEATS: Beat[] = [
-  { dur: 3000, u1: 0.012, ease: easeInCubic,    cam1: { theta: 30, dist: 20, rise: 9 } },   // ignition: hover ahead, dart + pad below
-  { dur: 6000, u1: 0.30,  ease: easeInOutCubic, cam1: { theta: 38, dist: 24, rise: 7 } },   // ascent: Earth shrinks behind the ship
-  { dur: 5000, u1: 0.462, ease: easeInOutSine,  cam1: { theta: 165, dist: 26, rise: 8 } },  // coast: swing around the ship to face the Moon
-  { dur: 5000, u1: 0.499, ease: easeInOutSine,  cam1: { theta: 178, dist: 22, rise: 6 } },  // lunar skim: tight chase over the surface
-  { dur: 4000, u1: 0.505, ease: easeInOutSine,  cam1: { theta: 135, dist: 24, rise: 8 } },  // earthrise: side angle — ship, limb, Earth
-  { dur: 4000, u1: 0.985, ease: easeInOutCubic, cam1: { theta: 178, dist: 27, rise: 10 } }, // return sprint: chase home
+  { dur: 3000, u1: 0.012, ease: easeInCubic,    cam1: { theta: 30, dist: 30, rise: 11 } },  // ignition: hover ahead, dart + pad below
+  { dur: 6000, u1: 0.30,  ease: easeInOutCubic, cam1: { theta: 38, dist: 38, rise: 12 } },  // ascent: parking arc + departure, Earth shrinking behind
+  { dur: 4500, u1: 0.462, ease: easeInOutSine,  cam1: { theta: 165, dist: 42, rise: 13 } }, // coast: swing around the ship to face the Moon
+  { dur: 6500, u1: 0.497, ease: easeInOutSine,  cam1: { theta: 170, dist: 34, rise: 10 } }, // approach + near-side crawl: Apollo sites drift past
+  { dur: 6000, u1: 0.507, ease: easeInOutSine,  cam1: { theta: 120, dist: 36, rise: 11 } }, // far side + earthrise, slow
+  { dur: 4500, u1: 0.985, ease: easeInOutCubic, cam1: { theta: 178, dist: 44, rise: 13 } }, // return sprint: chase home
 ]
 export const MISSION_TOTAL_MS = BEATS.reduce((s, b) => s + b.dur, 0)
-const CAM0: CamRig = { theta: 30, dist: 20, rise: 9 }
+const CAM0: CamRig = { theta: 30, dist: 30, rise: 11 }
 
 /** Pure timeline lookup: elapsed ms → path fraction + camera rig. Exported for tests. */
 export function missionStateAt(elapsedMs: number): { u: number; cam: CamRig } {
@@ -178,6 +178,16 @@ export function createLunarCinematic(deps: CineDeps): LunarCinematic {
     const smPos = cam.position.clone()
     const smTarget = curve.getPointAt(0).clone()
     const smUp = cam.up.clone()
+    // Parallel-transported ship frame: the up vector carries over from the previous frame
+    // (re-projected ⊥ the new travel direction) and only gently SETTLES toward the scene's
+    // radial up. Deriving up directly from the radial degenerates whenever travel is
+    // near-vertical — the climb-out — which sent the dart tumbling.
+    const shipUp = new THREE.Vector3()
+    {
+      const f0 = curve.getTangentAt(0).normalize()
+      const seed = Math.abs(f0.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)
+      shipUp.copy(seed.addScaledVector(f0, -seed.dot(f0)).normalize())
+    }
     let elapsed = 0
     let last = performance.now()
     let prevU = 0
@@ -200,16 +210,20 @@ export function createLunarCinematic(deps: CineDeps): LunarCinematic {
       const dM = shipPos.distanceTo(M)
       const wM = proximity(160, 60, dM)
       const forward = curve.getTangentAt(u).normalize()
-      // Up: radial from Earth, handing over to radial-from-Moon during the skim, then
-      // orthonormalized against the flight direction.
+      // Transport the ship's up, then settle it toward the scene reference (radial from
+      // Earth, handing over to radial-from-Moon during the skim) when that's well-defined.
       const upRef = new THREE.Vector3()
         .addScaledVector(shipPos.clone().normalize(), 1 - wM)
         .addScaledVector(shipPos.clone().sub(M).normalize(), wM)
-        .normalize()
-      const up = upRef.clone().addScaledVector(forward, -upRef.dot(forward)).normalize()
-      const right = new THREE.Vector3().crossVectors(up, forward).normalize()
+      shipUp.addScaledVector(forward, -shipUp.dot(forward)).normalize()
+      const bias = upRef.addScaledVector(forward, -upRef.dot(forward))
+      if (bias.lengthSq() > 0.1) {
+        shipUp.lerp(bias.normalize(), Math.min(1, dt / 1500))
+        shipUp.addScaledVector(forward, -shipUp.dot(forward)).normalize()
+      }
+      const right = new THREE.Vector3().crossVectors(shipUp, forward).normalize()
       ship.position.copy(shipPos)
-      ship.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, forward))
+      ship.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, shipUp, forward))
       // Born on the pad, dissolved just before the settle (mirrors the dart↔beacon handoff).
       const grow = Math.min(1, elapsed / 900)
       const fade = Math.max(0, Math.min(1, (MISSION_TOTAL_MS - elapsed) / 800))
@@ -220,11 +234,11 @@ export function createLunarCinematic(deps: CineDeps): LunarCinematic {
       const desiredPos = shipPos.clone()
         .addScaledVector(forward, Math.cos(th) * rig.dist)
         .addScaledVector(right, Math.sin(th) * rig.dist)
-        .addScaledVector(up, rig.rise)
+        .addScaledVector(shipUp, rig.rise)
       const desiredTarget = shipPos.clone().addScaledVector(forward, 3)
       smPos.lerp(desiredPos, Math.min(1, dt / 220))
       smTarget.lerp(desiredTarget, Math.min(1, dt / 220))
-      smUp.lerp(up, Math.min(1, dt / 300)).normalize()
+      smUp.lerp(shipUp, Math.min(1, dt / 300)).normalize()
       cam.position.copy(smPos)
       cam.up.copy(smUp)
       cam.lookAt(smTarget)

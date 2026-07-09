@@ -40,19 +40,7 @@ function slerpV(a: V3, b: V3, f: number): V3 {
   return add(scale(a, Math.sin((1 - f) * th) / s), scale(b, Math.sin(f * th) / s))
 }
 
-// Launch/entry arc between a surface point and a deep-space point: climb-then-steer. The
-// radius eases off the pad (f^1.15, zero initial slope — no teleport), the direction completes
-// its whole turn by 70% of the leg (smoothstep) once well clear of the surface, leaving a
-// straight final approach. Monotonic radius ≥ surface + slerped direction never enters the
-// sphere, so the pad can be anywhere on Earth — even facing directly away from the Moon.
-// (The first cut turned the direction early at low altitude, which read as a surface-hugging
-// corkscrew around the planet.)
-function sweep(surf: V3, deep: V3, f: number): V3 {
-  const t = Math.min(1, f / 0.7)
-  const dir = slerpV(norm(surf), norm(deep), t * t * (3 - 2 * t))
-  const r = mag(surf) + (mag(deep) - mag(surf)) * Math.pow(f, 1.15)
-  return scale(dir, r)
-}
+const smooth01 = (t: number) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t) }
 
 /**
  * One full Earth → loop-around-Moon → Earth "free-return" path, sampled as geo points
@@ -94,10 +82,44 @@ export function buildTrajectoryPoints(moonLat: number, moonLng: number, moonAlt:
 
   const No = Math.floor(N * 0.4), Nl = Math.floor(N * 0.2)
   const pts: V3[] = []
-  for (let i = 0; i < No; i++) pts.push(anchored ? sweep(Estart, sideA, i / No) : lerp(Estart, sideA, i / No)) // out to side A
+  // Anchored missions fly like a real one: climb out of the pad into a LOW PARKING ARC around
+  // Earth, coast to the point under the departure chord, then head out on the same clean
+  // straight chord the unanchored path uses (and mirror that coming home). The radius stays in
+  // [R, parking] on the arcs and the chords anchor at the moonward side, so the path never
+  // enters the sphere and never S-curves across the sky, wherever the pad is.
+  const parkR = R * 1.18
+  const depSurf = norm(add(u, scale(w, -0.03))) // surface point under the outbound chord (side A bias)
+  const retSurf = norm(add(u, scale(w, 0.03)))  //                       the return chord (side B bias)
+  if (anchored) {
+    const NA = Math.max(8, Math.floor(No * 0.45))
+    const padDir = norm(Estart)
+    for (let i = 0; i < NA; i++) {
+      const t = i / NA
+      const dir = slerpV(padDir, depSurf, smooth01(t))
+      const r = R + (parkR - R) * smooth01(Math.min(1, t * 2.5)) // climb tops out in the first 40% of the arc
+      pts.push(scale(dir, r))
+    }
+    const NBo = No - NA
+    for (let i = 0; i < NBo; i++) pts.push(lerp(scale(depSurf, parkR), sideA, i / NBo))
+  } else {
+    for (let i = 0; i < No; i++) pts.push(lerp(Estart, sideA, i / No)) // straight out to side A
+  }
   for (let i = 0; i <= Nl; i++) { const a = -Math.PI / 2 + Math.PI * (i / Nl); pts.push(add(M, add(scale(u, loopRadius * Math.cos(a)), scale(w, loopRadius * Math.sin(a))))) } // around the far side, A -> B
   const Nr = N - pts.length
-  for (let i = 1; i <= Nr; i++) pts.push(anchored ? sweep(Eend, sideB, 1 - i / Nr) : lerp(sideB, Eend, i / Nr)) // back from side B
+  if (anchored) {
+    const NB = Math.max(8, Math.floor(Nr * 0.45))
+    const NC = Nr - NB
+    for (let i = 1; i <= NC; i++) pts.push(lerp(sideB, scale(retSurf, parkR), i / NC))
+    const endDir = norm(Eend)
+    for (let i = 1; i <= NB; i++) {
+      const t = i / NB
+      const dir = slerpV(retSurf, endDir, smooth01(t))
+      const r = parkR - (parkR - R) * smooth01(Math.max(0, (t - 0.55) / 0.45)) // hold the arc, descend over the last 45%
+      pts.push(scale(dir, r))
+    }
+  } else {
+    for (let i = 1; i <= Nr; i++) pts.push(lerp(sideB, Eend, i / Nr)) // straight back from side B
+  }
 
   const points = pts.map((p) => cartesianToGeo(p, R))
   const cum = [0]
