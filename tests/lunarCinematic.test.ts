@@ -22,12 +22,16 @@ describe('missionStateAt', () => {
     expect(missionStateAt(23000).u).toBeLessThan(0.51)
   })
 
-  it('gaze weights always sum to 1 and end on Earth', () => {
-    for (let t = 0; t <= MISSION_TOTAL_MS; t += 500) {
-      const { look } = missionStateAt(t)
-      expect(look.ahead + look.moon + look.earth).toBeCloseTo(1, 5)
+  it('camera rig stays in sane bounds and ends in chase position', () => {
+    for (let t = 0; t <= MISSION_TOTAL_MS; t += 250) {
+      const { cam } = missionStateAt(t)
+      expect(cam.dist).toBeGreaterThan(10)
+      expect(cam.dist).toBeLessThan(40)
+      expect(cam.theta).toBeGreaterThanOrEqual(0)
+      expect(cam.theta).toBeLessThanOrEqual(180)
+      expect(cam.rise).toBeGreaterThanOrEqual(0)
     }
-    expect(missionStateAt(MISSION_TOTAL_MS).look.earth).toBeCloseTo(1, 5)
+    expect(missionStateAt(MISSION_TOTAL_MS).cam.theta).toBeCloseTo(178, 0)
   })
 })
 

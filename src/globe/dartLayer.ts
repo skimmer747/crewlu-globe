@@ -49,7 +49,10 @@ function envelope(p: number, f: EnvelopeFractions): number {
 // forward (+Z). The two top panels are shaded as if lit from the left, so the spine crease
 // reads as 3D even from straight overhead (the angle the follow-camera usually gives). A
 // bright nose gradient, a glowing edge rim, a layered comet tail and an afterburner core.
-function buildDart(): any {
+// Exported so the lunar cinematic can fly its own instance (via scene().add() — the
+// customThreeObject slot stays owned by createDartLayer). Returned scale-0 and invisible;
+// callers set visible/scale.
+export function buildDart(): any {
   const N = [0, 0.18, 2.0], S = [0, 0.82, -0.95]             // nose, tall spine tail (steep roof)
   const L = [-0.95, -0.32, -1.05], R = [0.95, -0.32, -1.05], B = [0, -0.16, -0.7] // swept wingtips, belly
   const nose = new THREE.Color('#ffffff')

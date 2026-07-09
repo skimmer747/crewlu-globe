@@ -22,8 +22,13 @@ existing mission view. The flight is re-recordable as a shareable 1080p video.
   beacon at the point on the 415,119 NM path that career miles have reached.
 - **Extras (all in v1):** Apollo-style telemetry overlay, earthrise held moment,
   Apollo landing-site labels, shareable video export.
-- **Camera approach:** first-person path flight (camera is the ship, dashed line
-  reveals ahead). Chase-a-dart and director's-cuts approaches were rejected.
+- **Camera approach (revised same-day per user feedback):** chase cam. First-person
+  proved disorienting in practice ("hard to tell where I am") — the shipped design flies
+  a dedicated dart instance (`buildDart()` export from dartLayer, added via
+  `scene().add()`) along the trajectory, with the camera orbiting it on keyframed
+  azimuth/distance/rise beats, always looking at the ship: ahead of it on ascent so
+  Earth shrinks behind it, swinging around it at the coast turnaround, tight chase over
+  the lunar surface. Director's-cuts remains rejected.
 
 ## Shot list (~28 s)
 
