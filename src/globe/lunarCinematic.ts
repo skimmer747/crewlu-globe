@@ -41,10 +41,12 @@ interface Beat { dur: number; u1: number; ease: (k: number) => number; look1: Ga
 // u = arc-length fraction of the path. The Moon loop is only ~1.2% of the path's length, so
 // time maps to u through beats: skim/earthrise crawl through that sliver while ascent/return
 // sprint across the empty two-hundred-thousand-mile legs. Gaze weights must each sum to 1.
+// Ignition + ascent look BACK at Earth (the pad, then the shrinking planet — that's the shot
+// that tells you where you are); the coast beat is the turnaround to face the Moon.
 const BEATS: Beat[] = [
-  { dur: 3000, u1: 0.012, ease: easeInCubic,    look1: { ahead: 1, moon: 0, earth: 0 } },       // ignition
-  { dur: 6000, u1: 0.30,  ease: easeInOutCubic, look1: { ahead: 0.85, moon: 0.15, earth: 0 } }, // ascent
-  { dur: 5000, u1: 0.462, ease: easeInOutSine,  look1: { ahead: 0.45, moon: 0.55, earth: 0 } }, // translunar coast
+  { dur: 3000, u1: 0.012, ease: easeInCubic,    look1: { ahead: 0.1, moon: 0, earth: 0.9 } },   // ignition: looking down at the pad
+  { dur: 6000, u1: 0.30,  ease: easeInOutCubic, look1: { ahead: 0.2, moon: 0, earth: 0.8 } },   // ascent: Earth falls away behind
+  { dur: 5000, u1: 0.462, ease: easeInOutSine,  look1: { ahead: 0.45, moon: 0.55, earth: 0 } }, // coast: turn to face the Moon
   { dur: 5000, u1: 0.499, ease: easeInOutSine,  look1: { ahead: 0.35, moon: 0.65, earth: 0 } }, // lunar skim
   { dur: 4000, u1: 0.505, ease: easeInOutSine,  look1: { ahead: 0, moon: 0.1, earth: 0.9 } },   // earthrise hold
   { dur: 4000, u1: 0.985, ease: easeInOutCubic, look1: { ahead: 0, moon: 0, earth: 1 } },       // return sprint
@@ -56,7 +58,7 @@ export function missionStateAt(elapsedMs: number): { u: number; look: Gaze } {
   const t = Math.max(0, Math.min(MISSION_TOTAL_MS, elapsedMs))
   let acc = 0
   let u0 = 0
-  let look0: Gaze = { ahead: 1, moon: 0, earth: 0 }
+  let look0: Gaze = { ahead: 0.1, moon: 0, earth: 0.9 }
   for (const b of BEATS) {
     if (t <= acc + b.dur) {
       const k = (t - acc) / b.dur
@@ -157,6 +159,8 @@ export function createLunarCinematic(deps: CineDeps): LunarCinematic {
 
     const cam = deps.globe.camera()
     const startPos = cam.position.clone()
+    const prevViewDir = new THREE.Vector3()
+    cam.getWorldDirection(prevViewDir)
     let elapsed = 0
     let last = performance.now()
     let prevU = 0
@@ -181,15 +185,20 @@ export function createLunarCinematic(deps: CineDeps): LunarCinematic {
       const dM = base.distanceTo(M)
       const wM = proximity(160, 60, dM)
       const pos = base.clone()
-        .addScaledVector(base.clone().normalize(), 6 * (1 - wM))
+        .addScaledVector(base.clone().normalize(), 8 * (1 - wM))
         .addScaledVector(base.clone().sub(M).normalize(), 5 * wM)
 
-      // Gaze: weighted blend of path-ahead / Moon / Earth (the Earth term is the origin —
-      // nothing to add).
+      // Gaze: blend view DIRECTIONS (not target positions — a positional blend sweeps its
+      // target through the camera itself on the 180° Earth→Moon turnaround and lookAt spins).
+      // The weighted direction sum can only cancel to ~zero mid-flip; the per-frame smoothing
+      // below carries continuity straight through that null and makes every pan filmic.
       const ahead = curve.getPointAt(Math.min(1, u + 0.03))
-      const target = new THREE.Vector3()
-        .addScaledVector(ahead, look.ahead)
-        .addScaledVector(M, look.moon)
+      const rawDir = new THREE.Vector3()
+        .addScaledVector(ahead.clone().sub(pos).normalize(), look.ahead)
+        .addScaledVector(M.clone().sub(pos).normalize(), look.moon)
+        .addScaledVector(pos.clone().negate().normalize(), look.earth)
+      const desired = rawDir.lengthSq() < 0.05 ? prevViewDir.clone() : rawDir.normalize()
+      prevViewDir.lerp(desired, Math.min(1, dt / 250)).normalize()
 
       // Up: radial from Earth, handing over to radial-from-Moon up close (prevents the
       // degenerate lookAt when staring at Earth from behind the Moon).
@@ -202,7 +211,7 @@ export function createLunarCinematic(deps: CineDeps): LunarCinematic {
       const blend = easeOutCubic(Math.min(1, elapsed / 800))
       cam.position.copy(startPos.clone().lerp(pos, blend))
       cam.up.copy(up)
-      cam.lookAt(target)
+      cam.lookAt(cam.position.clone().addScaledVector(prevViewDir, 500))
 
       deps.setReveal(Math.min(1, u + 0.04))
       deps.moonMesh.setLabelOpacity(proximity(420, 180, dM))

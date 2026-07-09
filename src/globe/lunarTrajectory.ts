@@ -40,13 +40,17 @@ function slerpV(a: V3, b: V3, f: number): V3 {
   return add(scale(a, Math.sin((1 - f) * th) / s), scale(b, Math.sin(f * th) / s))
 }
 
-// Launch/entry arc between a surface point and a deep-space point: the direction turns early
-// (f^0.6) while the radius climbs late (f^1.6), so the path can start anywhere on Earth — even
-// facing away from the Moon — and arcs over the horizon without ever entering the sphere
-// (radius is monotonic and never below the surface, unlike a straight chord).
+// Launch/entry arc between a surface point and a deep-space point: climb-then-steer. The
+// radius eases off the pad (f^1.15, zero initial slope — no teleport), the direction completes
+// its whole turn by 70% of the leg (smoothstep) once well clear of the surface, leaving a
+// straight final approach. Monotonic radius ≥ surface + slerped direction never enters the
+// sphere, so the pad can be anywhere on Earth — even facing directly away from the Moon.
+// (The first cut turned the direction early at low altitude, which read as a surface-hugging
+// corkscrew around the planet.)
 function sweep(surf: V3, deep: V3, f: number): V3 {
-  const dir = slerpV(norm(surf), norm(deep), Math.pow(f, 0.6))
-  const r = mag(surf) + (mag(deep) - mag(surf)) * Math.pow(f, 1.6)
+  const t = Math.min(1, f / 0.7)
+  const dir = slerpV(norm(surf), norm(deep), t * t * (3 - 2 * t))
+  const r = mag(surf) + (mag(deep) - mag(surf)) * Math.pow(f, 1.15)
   return scale(dir, r)
 }
 
