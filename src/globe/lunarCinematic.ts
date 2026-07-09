@@ -98,7 +98,7 @@ export function createLunarCinematic(deps: CineDeps): LunarCinematic {
   let playing = false
   let cancelled = false
   let raf = 0
-  let skipLeftMs = 0
+  let skipping = false
   let resolveRun: ((ok: boolean) => void) | null = null
   let cleanups: (() => void)[] = []
 
@@ -115,11 +115,15 @@ export function createLunarCinematic(deps: CineDeps): LunarCinematic {
     resolveRun = null
   }
 
-  const skip = () => { if (playing && skipLeftMs <= 0) skipLeftMs = 600 }
+  // Fast-forward: a flat 40× time multiplier finishes any remaining flight in well under a
+  // second at 60fps, and still converges under heavy rAF throttling (a decaying-budget ramp
+  // burned its whole budget in one throttled frame).
+  const skip = () => { if (playing) skipping = true }
 
   async function play(o: CinePlayOpts): Promise<boolean> {
     if (playing) return false
     cancelled = false
+    skipping = false
 
     const pts = o.traj.points.map((p) => { const c = deps.globe.getCoords(p.lat, p.lng, p.alt); return new THREE.Vector3(c.x, c.y, c.z) })
     const curve = new THREE.CatmullRomCurve3(pts)
@@ -164,10 +168,7 @@ export function createLunarCinematic(deps: CineDeps): LunarCinematic {
       if (!playing) return
       let dt = Math.min(100, now - last) // hidden-tab clamp: the flight pauses instead of jump-cutting
       last = now
-      if (skipLeftMs > 0) {
-        dt *= Math.max(1, (MISSION_TOTAL_MS - elapsed) / Math.max(16, skipLeftMs))
-        skipLeftMs = Math.max(0, skipLeftMs - dt)
-      }
+      if (skipping) dt *= 40
       elapsed += dt
       if (holdMs != null && !(window as any).__cineGo) elapsed = Math.min(elapsed, holdMs)
       elapsed = Math.min(MISSION_TOTAL_MS, elapsed)

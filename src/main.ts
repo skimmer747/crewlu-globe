@@ -137,8 +137,10 @@ async function run() {
     // zoomed in, so it couldn't shrink with Earth until Earth had nearly caught down to it.
     if (missionFlying) {
       moon.el.style.opacity = '0' // the cinematic's 3D moon owns the sky; hide the DOM overlay (opacity, not display — three-globe owns the wrap's display)
+      beacon.el.style.visibility = 'hidden' // fixed-px beacon dwarfs the tiny Earth from lunar distance (visibility, not opacity — setVeil rewrites opacity every frame)
     } else {
       moon.el.style.opacity = ''
+      beacon.el.style.visibility = ''
       moon.setScale(Math.min(10, Math.max(0.02, (MOON_EARTH_RATIO * earthRpx) / 23.8))) // 23.8px = rendered disk radius at scale 1
       // Feather the Moon behind Earth (soft fade across the atmosphere) instead of a hard limb clip,
       // so it recedes behind the blue glow rather than looking cut out. Mask rides the scaled inner el.
@@ -253,7 +255,7 @@ async function run() {
     if (missionFlying) return // the cinematic owns the line, reveal, and readout while flying
     // Orient the swing to face the lunar-return vantage (camera sits at lat 0, lng moonLng+90).
     // Use that deterministic direction rather than the live camera, which is still mid-fly-in.
-    const camDir = geoToCartesian(0, moon.datum.lng + 90, 0, 100)
+    const camDir = geoToCartesian(0, moon.datum.lng + 120, 0, 100)
     lunar.setPath(buildTrajectoryPoints(moon.datum.lat, moon.datum.lng, moon.datum.alt, { cam: camDir, start: { lat: beacon.pos.lat, lng: beacon.pos.lng } }))
     const laps = lunarReturns(currentMiles)
     hud.setLunarReadout(`DISTANCE FLOWN  ${Math.round(currentMiles).toLocaleString()} NM\nEARTH–MOON RETURN  ${LUNAR_RETURN_NM.toLocaleString()} NM\n= ${laps.toFixed(2)} LUNAR RETURNS`)
@@ -672,13 +674,13 @@ async function run() {
   let savedMaxDist = 0, savedPov: any = null
 
   const missionView = (durationMs: number) => {
-    scene.globe.pointOfView({ lat: 0, lng: moon.datum.lng + 90, altitude: 62 }, durationMs)
+    scene.globe.pointOfView({ lat: 0, lng: moon.datum.lng + 120, altitude: 75 }, durationMs)
     refreshLunar(true)
   }
 
   const startMission = async (): Promise<boolean> => {
     missionFlying = true
-    const camDir = geoToCartesian(0, moon.datum.lng + 90, 0, 100)
+    const camDir = geoToCartesian(0, moon.datum.lng + 120, 0, 100)
     const traj = buildTrajectoryPoints(moon.datum.lat, moon.datum.lng, moon.datum.alt, { cam: camDir, start: { lat: beacon.pos.lat, lng: beacon.pos.lng } })
     lunar.setPath(traj)
     lunar.setReveal(0)
@@ -706,7 +708,7 @@ async function run() {
       savedMaxDist = ctr.maxDistance; savedPov = scene.globe.pointOfView()
       ctr.maxDistance = 9000; ctr.autoRotate = false
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        scene.globe.pointOfView({ lat: 0, lng: moon.datum.lng + 90, altitude: 62 }, 1400)
+        scene.globe.pointOfView({ lat: 0, lng: moon.datum.lng + 120, altitude: 75 }, 1400)
         refreshLunar(true)
       } else {
         const done = await startMission()
