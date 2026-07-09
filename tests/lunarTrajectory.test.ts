@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { LUNAR_RETURN_NM, lunarReturns, buildTrajectoryPoints, sliceTrajectory } from '../src/globe/lunarTrajectory'
+import { LUNAR_RETURN_NM, lunarReturns, buildTrajectoryPoints, sliceTrajectory, pointAtFraction } from '../src/globe/lunarTrajectory'
+import type { GeoPoint } from '../src/globe/lunarTrajectory'
 
 describe('lunarReturns', () => {
   it('one round trip = the Earth-Moon return distance', () => {
@@ -25,6 +26,51 @@ describe('buildTrajectoryPoints', () => {
   it('has a monotonic cumulative length', () => {
     for (let i = 1; i < t.cum.length; i++) expect(t.cum[i]).toBeGreaterThanOrEqual(t.cum[i - 1])
     expect(t.length).toBeGreaterThan(0)
+  })
+})
+
+const R = 100
+const rOf = (p: GeoPoint) => R * (1 + p.alt)
+
+describe('buildTrajectoryPoints with a launch anchor', () => {
+  const moon = { lat: 12, lng: -140, alt: 59.3 }
+  const cam = { x: 0, y: 0, z: 100 }
+  const start = { lat: 38.17, lng: -85.74 } // SDF
+
+  it('starts exactly at the pad and returns near it', () => {
+    const t = buildTrajectoryPoints(moon.lat, moon.lng, moon.alt, { cam, start })
+    expect(t.points[0].lat).toBeCloseTo(start.lat, 1)
+    expect(t.points[0].lng).toBeCloseTo(start.lng, 1)
+    const end = t.points[t.points.length - 1]
+    expect(Math.abs(end.lat - start.lat)).toBeLessThan(12)
+    expect(Math.abs(rOf(end) - R)).toBeLessThan(0.5)
+  })
+
+  it('never dips inside the Earth, even from an antipodal pad', () => {
+    const away = { lat: -12, lng: 40 } // opposite side of Earth from the Moon
+    const t = buildTrajectoryPoints(moon.lat, moon.lng, moon.alt, { cam, start: away })
+    for (const p of t.points) expect(rOf(p)).toBeGreaterThanOrEqual(R - 1e-6)
+  })
+
+  it('still reaches and loops the Moon', () => {
+    const t = buildTrajectoryPoints(moon.lat, moon.lng, moon.alt, { cam, start })
+    const maxR = Math.max(...t.points.map(rOf))
+    expect(maxR).toBeGreaterThan(6000)
+    for (let i = 1; i < t.cum.length; i++) expect(t.cum[i]).toBeGreaterThanOrEqual(t.cum[i - 1])
+  })
+
+  it('unanchored path is unchanged (starts on the surface near the moonward point)', () => {
+    const t = buildTrajectoryPoints(moon.lat, moon.lng, moon.alt, { cam })
+    expect(Math.abs(rOf(t.points[0]) - R)).toBeLessThan(0.5)
+  })
+})
+
+describe('pointAtFraction', () => {
+  const t = buildTrajectoryPoints(10, -120, 59.3, { cam: { x: 0, y: 0, z: 100 }, start: { lat: 38, lng: -85 } })
+  it('interpolates endpoints and interior', () => {
+    expect(pointAtFraction(t, 0).lat).toBeCloseTo(t.points[0].lat, 5)
+    expect(pointAtFraction(t, 1).alt).toBeCloseTo(t.points[t.points.length - 1].alt, 5)
+    expect(rOf(pointAtFraction(t, 0.5))).toBeGreaterThan(1000) // mid-path is deep space
   })
 })
 
