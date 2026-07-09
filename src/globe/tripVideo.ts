@@ -29,7 +29,20 @@ export interface TripVideoOpts {
   onProgress?: (pct: number) => void
 }
 
-export async function recordTripVideo(o: TripVideoOpts): Promise<Blob> {
+export interface CanvasRecOpts {
+  gl: HTMLCanvasElement
+  width: number
+  height: number
+  fps: number
+  totalMs: number
+  onStart?: () => void
+  // blit() cover-crops the live GL canvas onto the stage; call it (or not) per frame.
+  drawFrame(ctx: CanvasRenderingContext2D, w: number, h: number, elapsedMs: number, blit: () => void): void
+  onProgress?: (pct: number) => void
+}
+
+/** Real-time canvas capture: stage canvas + MediaRecorder, one drawFrame per rAF. */
+export async function recordCanvas(o: CanvasRecOpts): Promise<Blob> {
   const mime = pickMime()
   if (!mime) throw new Error('MediaRecorder unsupported')
 
@@ -48,25 +61,37 @@ export async function recordTripVideo(o: TripVideoOpts): Promise<Blob> {
   }
 
   rec.start()
-  o.play()
-  const total = o.flightMs + o.outroMs
+  o.onStart?.()
   const t0 = performance.now()
 
   await new Promise<void>((resolve) => {
     const frame = () => {
       const elapsed = performance.now() - t0
-      if (elapsed < o.flightMs) { blit(); o.drawOverlay?.(ctx, o.width, o.height) }
-      else o.drawOutro(ctx, o.width, o.height)
-      o.onProgress?.(Math.min(0.99, elapsed / total))
-      if (elapsed >= total) resolve()
+      o.drawFrame(ctx, o.width, o.height, elapsed, blit)
+      o.onProgress?.(Math.min(0.99, elapsed / o.totalMs))
+      if (elapsed >= o.totalMs) resolve()
       else requestAnimationFrame(frame)
     }
     requestAnimationFrame(frame)
   })
 
-  o.stop()
   rec.stop()
   await stopped
   o.onProgress?.(1)
   return new Blob(chunks, { type: mime })
+}
+
+export async function recordTripVideo(o: TripVideoOpts): Promise<Blob> {
+  const blob = await recordCanvas({
+    gl: o.gl, width: o.width, height: o.height, fps: o.fps,
+    totalMs: o.flightMs + o.outroMs,
+    onStart: o.play,
+    drawFrame: (ctx, w, h, elapsed, blit) => {
+      if (elapsed < o.flightMs) { blit(); o.drawOverlay?.(ctx, w, h) }
+      else o.drawOutro(ctx, w, h)
+    },
+    onProgress: o.onProgress,
+  })
+  o.stop()
+  return blob
 }
