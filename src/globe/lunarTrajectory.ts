@@ -145,7 +145,7 @@ export function createLunarTrajectory(globe: any): LunarTrajectory {
     if (line) { globe.scene().remove(line); line.geometry.dispose(); line = null }
   }
 
-  let marker: THREE.Sprite | null = null
+  let marker: any = null
   const MARKER_SIZE = 60
   const markerTexture = (() => {
     const c = document.createElement('canvas'); c.width = c.height = 64
@@ -156,7 +156,7 @@ export function createLunarTrajectory(globe: any): LunarTrajectory {
     return new THREE.CanvasTexture(c)
   })()
   const removeMarker = () => {
-    if (marker) { globe.scene().remove(marker); (marker.material as THREE.SpriteMaterial).dispose(); marker = null }
+    if (marker) { globe.scene().remove(marker); marker.material.dispose(); marker = null }
   }
 
   return {
