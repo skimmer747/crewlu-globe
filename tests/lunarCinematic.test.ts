@@ -17,9 +17,17 @@ describe('missionStateAt', () => {
   })
 
   it('crawls the Moon for the near-side + earthrise beats', () => {
-    // 20s–26s of the timeline crawls around the Moon (u ≈ 0.497 → 0.507)
-    expect(missionStateAt(20500).u).toBeGreaterThan(0.49)
-    expect(missionStateAt(25500).u).toBeLessThan(0.51)
+    // 19s–25s of the timeline crawls around the Moon (u ≈ 0.497 → 0.507)
+    expect(missionStateAt(19500).u).toBeGreaterThan(0.49)
+    expect(missionStateAt(24500).u).toBeLessThan(0.51)
+  })
+
+  it('is fully behind the ship a quarter of the way out', () => {
+    // theta ≈ 172+ (chase) from u ≈ 0.12 onward — the camera must not lag the swing
+    // until the ship is already at the Moon.
+    const t = 7500 // end of the settle-behind beat
+    expect(missionStateAt(t).cam.theta).toBeGreaterThan(165)
+    expect(missionStateAt(t).u).toBeLessThan(0.15)
   })
 
   it('camera rig stays in sane bounds and ends in chase position', () => {

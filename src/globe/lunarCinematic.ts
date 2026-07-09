@@ -49,8 +49,9 @@ interface Beat { dur: number; u1: number; ease: (k: number) => number; cam1: Cam
 // sprint across the empty two-hundred-thousand-mile legs.
 const BEATS: Beat[] = [
   { dur: 3000, u1: 0.012, ease: easeInCubic,    cam1: { theta: 30, dist: 30, rise: 11 } },  // ignition: hover ahead, dart + pad below
-  { dur: 6000, u1: 0.30,  ease: easeInOutCubic, cam1: { theta: 38, dist: 38, rise: 12 } },  // ascent: parking arc + departure, Earth shrinking behind
-  { dur: 4500, u1: 0.462, ease: easeInOutSine,  cam1: { theta: 165, dist: 42, rise: 13 } }, // coast: swing around the ship to face the Moon
+  { dur: 2500, u1: 0.06,  ease: easeInOutSine,  cam1: { theta: 120, dist: 38, rise: 12 } }, // climb-out: camera swings around the ship, Earth sliding past
+  { dur: 2000, u1: 0.12,  ease: easeInOutSine,  cam1: { theta: 172, dist: 42, rise: 12 } }, // settle in behind as the ship burns outbound
+  { dur: 5000, u1: 0.462, ease: easeInOutCubic, cam1: { theta: 178, dist: 44, rise: 13 } }, // long chase: Moon grows dead ahead
   { dur: 6500, u1: 0.497, ease: easeInOutSine,  cam1: { theta: 170, dist: 34, rise: 10 } }, // approach + near-side crawl: Apollo sites drift past
   { dur: 6000, u1: 0.507, ease: easeInOutSine,  cam1: { theta: 120, dist: 36, rise: 11 } }, // far side + earthrise, slow
   { dur: 4500, u1: 0.985, ease: easeInOutCubic, cam1: { theta: 178, dist: 44, rise: 13 } }, // return sprint: chase home
