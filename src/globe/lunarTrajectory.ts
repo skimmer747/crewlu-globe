@@ -14,27 +14,37 @@ const CRUISE_KT = 485       // widebody cruise TAS (~Mach 0.85)
 const TRANSCON_NM = 2475    // JFK–LAX great circle
 
 /**
- * The "trip log" shown when the lunar ship parks: how far you went, in fun, personal terms —
- * days spent aloft, laps of the Earth, transcons, and how a lunar return scales at jet speed.
+ * The "trip log" shown when the lunar ship parks: where you are on the racetrack (lap +
+ * circuit leg from the progress path), then how far you went in fun, personal terms — days
+ * aloft, laps of the Earth, transcons, and how a lunar return scales at jet speed.
  */
-export function lunarTripLog(miles: number, blockHours: number): string {
+export function lunarTripLog(
+  miles: number, blockHours: number,
+  pos?: { lap: number; segment: CircuitSegment; legProgress: number },
+): string {
   const laps = miles / LUNAR_RETURN_NM
   const nm = Math.round(miles).toLocaleString()
   const earthLaps = miles / EARTH_LAP_NM
   const daysAloft = blockHours / 24
   const transcons = Math.round(miles / TRANSCON_NM)
   const returnDaysNonstop = Math.round(LUNAR_RETURN_NM / CRUISE_KT / 24)
-  const whole = Math.floor(laps)
-  const rem = Math.round((laps - whole) * 100)
 
-  const head = laps < 1
-    ? `${nm} NM flown — ${Math.round(laps * 100)}% of the way to the Moon`
-    : `${nm} NM — to the Moon & back ×${whole}${rem >= 2 ? `, +${rem}% again` : ''}`
+  let head: string
+  if (pos) {
+    const pct = Math.round(pos.legProgress * 100)
+    head = pos.segment === 'moon'
+      ? `LAP ${pos.lap} · ROUNDING THE MOON`
+      : pos.segment === 'outbound'
+        ? `LAP ${pos.lap} · OUTBOUND — ${pct}% of the way to the Moon`
+        : `LAP ${pos.lap} · INBOUND — ${pct}% of the way home`
+  } else {
+    head = `${nm} NM flown — ${laps.toFixed(2)} Earth–Moon returns`
+  }
 
   return [
     '◓ LUNAR RETURN · TRIP LOG',
     head,
-    `${laps.toFixed(2)} Earth–Moon returns · round trip ${LUNAR_RETURN_NM.toLocaleString()} NM`,
+    `${nm} NM · ${laps.toFixed(2)} returns of ${LUNAR_RETURN_NM.toLocaleString()} NM round trip`,
     `${Math.round(blockHours).toLocaleString()} block hours — ${daysAloft.toFixed(1)} days in the air`,
     `${earthLaps.toFixed(1)}× around the Earth · ${transcons.toLocaleString()} JFK–LAX transcons`,
     `at jet cruise, a full return is ~${returnDaysNonstop} days nonstop`,
@@ -159,13 +169,26 @@ export function buildTrajectoryPoints(moonLat: number, moonLng: number, moonAlt:
   return { points, cum, length: cum[cum.length - 1] }
 }
 
-export interface ProgressPath extends Trajectory { stopFraction: number; reachedMoon: boolean; loopCount: number; outLen: number }
+export type CircuitSegment = 'outbound' | 'moon' | 'inbound'
+
+export interface ProgressPath extends Trajectory {
+  stopFraction: number   // odometer stop as a fraction of the drawn path's length
+  lap: number            // 1-based lap the ship is on (true lap, even past the drawn cap)
+  segment: CircuitSegment // where on the circuit the ship parks
+  legProgress: number    // 0..1 within that segment (drives the trip-log headline)
+  strands: number        // circuits actually drawn (capped)
+}
+
+// How many circuits to draw before the racetrack gets cluttered; a 20-return career still
+// shows 3 strands, with the true lap number carried in `lap` for the trip log.
+const MAX_STRANDS = 3
 
 /**
- * "Fly to your earned spot" path: Earth pad → out to the Moon (this transit spans lunar-returns
- * 0..1) → `loopCount` coiled laps around the Moon (each lap = one more return). No return-home
- * leg. `stopFraction` is where `laps` lands along the path; the ship parks there, and the line
- * reveals bright up to it, faint beyond. loopCount = ceil(laps)-1 (0 below one full return).
+ * The lunar-return RACETRACK: one circuit = Earth → out to the Moon → around the Moon →
+ * back → around the Earth (the figure-8 free-return picture). One full lunar return of
+ * mileage = one circuit; the mileage is an odometer along the chained circuits, and the ship
+ * PARKS at exactly the odometer's spot — mid-outbound, rounding the Moon, or heading home.
+ * Each circuit is offset slightly out-of-plane so multiple laps read as separate strands.
  */
 export function buildProgressPath(
   moonLat: number, moonLng: number, moonAlt: number,
@@ -174,7 +197,7 @@ export function buildProgressPath(
   const R = opts.R ?? 100
   const loopRadius = opts.loopRadius ?? 45
   const laps = Math.max(0, opts.laps)
-  const loopCount = Math.max(0, Math.ceil(laps) - 1) // laps beyond the first arrival
+  const C = Math.min(MAX_STRANDS, Math.max(1, Math.ceil(laps || 1e-4)))
 
   const mc = geoToCartesian(moonLat, moonLng, moonAlt, R)
   const M: V3 = [mc.x, mc.y, mc.z]
@@ -187,47 +210,72 @@ export function buildProgressPath(
     if (mag(v) < 1e-6) v = sub([1, 0, 0], scale(u, dot([1, 0, 0], u)))
     v = norm(v); w = norm(cross(u, v))
   }
-  const n3 = norm(cross(u, w)) // out-of-plane axis for the coil
+  const n3 = norm(cross(u, w)) // out-of-plane axis separating the strands
 
   const Estart = (() => { const c = geoToCartesian(opts.start.lat, opts.start.lng, 0, R); return [c.x, c.y, c.z] as V3 })()
   const padDir = norm(Estart)
   const parkR = R * 1.18
-  const depSurf = norm(add(u, scale(w, -0.03)))
-  const entry: V3 = add(M, scale(u, -loopRadius)) // near-side loop entry (faces Earth)
+  const depSurf = norm(add(u, scale(w, -0.03))) // surface point under the outbound chord
+  const retSurf = norm(add(u, scale(w, 0.03)))  //                       the return chord
+  const anti = scale(u, -1)                     // anti-Moon direction — the Earth turn rounds the back
 
   const pts: V3[] = []
-  // Outbound: parking-arc climb off the pad, then a straight chord to the Moon entry.
-  const NA = 60, NB = 110
-  for (let i = 0; i < NA; i++) {
-    const t = i / NA
-    const dir = slerpV(padDir, depSurf, smooth01(t))
-    const r = R + (parkR - R) * smooth01(Math.min(1, t * 2.5))
-    pts.push(scale(dir, r))
-  }
-  for (let i = 0; i <= NB; i++) pts.push(lerp(scale(depSurf, parkR), entry, i / NB))
-  const outEndIndex = pts.length - 1
-  // Coiled laps: full circles around the Moon (radius loopRadius in the u–w plane), drifting
-  // along n3 into a spring so multiple laps read as separate passes, not one thick ring.
-  const NLoop = 64
-  const amp = loopRadius * 0.5
-  const steps = loopCount * NLoop
-  for (let s = 1; s <= steps; s++) {
-    const a = (s / NLoop) * 2 * Math.PI
-    const off = (s / Math.max(1, steps)) * amp
-    pts.push(add(add(M, add(scale(u, -loopRadius * Math.cos(a)), scale(w, loopRadius * Math.sin(a)))), scale(n3, off)))
+  const bounds: number[] = []                                  // first point index of each circuit
+  const marks: { moon: number; inbound: number }[] = []        // per-circuit sub-boundaries
+  for (let c = 0; c < C; c++) {
+    bounds.push(pts.length)
+    const off = scale(n3, (c - (C - 1) / 2) * loopRadius * 0.6)
+    const pR = parkR + 4 * c
+    if (c === 0) {
+      // Launch: climb out of the pad toward the departure point, topping out at parking altitude.
+      for (let i = 0; i < 36; i++) {
+        const t = i / 36
+        const dir = slerpV(padDir, depSurf, smooth01(t))
+        const r = R + (pR - R) * smooth01(Math.min(1, t * 2.5))
+        pts.push(scale(dir, r))
+      }
+    } else {
+      // Earth turn: swing the LONG way around the planet (via the anti-Moon side) back to the
+      // departure point — the "head back around Earth" half of the figure-8.
+      for (let i = 0; i < 26; i++) pts.push(scale(slerpV(retSurf, anti, smooth01(i / 26)), pR))
+      for (let i = 0; i < 26; i++) pts.push(scale(slerpV(anti, depSurf, smooth01(i / 26)), pR))
+    }
+    const sideAc = add(add(M, scale(w, -loopRadius)), off)
+    const sideBc = add(add(M, scale(w, loopRadius)), off)
+    const depP = scale(depSurf, pR)
+    const retP = scale(retSurf, pR)
+    for (let i = 0; i <= 78; i++) pts.push(lerp(depP, sideAc, i / 78))                       // outbound chord
+    marks[c] = { moon: pts.length, inbound: 0 }
+    for (let i = 1; i <= 26; i++) { const a = -Math.PI / 2 + Math.PI * (i / 26); pts.push(add(add(M, add(scale(u, loopRadius * Math.cos(a)), scale(w, loopRadius * Math.sin(a)))), off)) } // around the far side
+    marks[c].inbound = pts.length
+    for (let i = 1; i <= 78; i++) pts.push(lerp(sideBc, retP, i / 78))                        // return chord
   }
 
   const points = pts.map((p) => cartesianToGeo(p, R))
   const cum = [0]
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + mag(sub(pts[i], pts[i - 1])))
   const length = cum[cum.length - 1]
-  const outLen = cum[outEndIndex]
-  const perLoop = loopCount > 0 ? (length - outLen) / loopCount : 0
-  // Returns → distance: 0..1 spans the outbound; each further return is one lap.
-  const stopDist = laps <= 1 ? laps * outLen : outLen + (laps - 1) * perLoop
+
+  // Odometer → stop: full circuits, then the remainder into the lap the ship is on. Careers
+  // past the drawn cap park on the last strand but keep the true lap number.
+  const cumB = bounds.map((i) => cum[i]).concat([length])
+  const lap = Math.max(1, Math.ceil(laps || 1e-4))
+  const cIdx = Math.min(C, lap) - 1
+  const remRaw = laps - Math.floor(laps)
+  const rem = laps > 0 && remRaw === 0 ? 1 : remRaw // integer returns = the end of that circuit
+  const stopDist = cumB[cIdx] + rem * (cumB[cIdx + 1] - cumB[cIdx])
   const stopFraction = length > 0 ? Math.max(0, Math.min(1, stopDist / length)) : 0
 
-  return { points, cum, length, stopFraction, reachedMoon: laps >= 1, loopCount, outLen }
+  // Which leg of the circuit the ship parks on (opener folds into 'outbound').
+  const dMoon = cum[marks[cIdx].moon], dIn = cum[marks[cIdx].inbound]
+  let segment: CircuitSegment
+  let legProgress: number
+  if (stopDist < dMoon) { segment = 'outbound'; legProgress = (stopDist - cumB[cIdx]) / Math.max(1, dMoon - cumB[cIdx]) }
+  else if (stopDist < dIn) { segment = 'moon'; legProgress = (stopDist - dMoon) / Math.max(1, dIn - dMoon) }
+  else { segment = 'inbound'; legProgress = (stopDist - dIn) / Math.max(1, cumB[cIdx + 1] - dIn) }
+  legProgress = Math.max(0, Math.min(1, legProgress))
+
+  return { points, cum, length, stopFraction, lap, segment, legProgress, strands: C }
 }
 
 /** Geo point at a fraction [0..1] of the path's length. */

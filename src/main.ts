@@ -19,7 +19,7 @@ import { createCityLabels } from './globe/cityLabels'
 import { createHud } from './globe/hud'
 import { createTimelineDock, SPEEDS } from './globe/timelineDock'
 import { createPlayback } from './globe/playback'
-import { createLunarTrajectory, buildProgressPath, lunarReturns, lunarTripLog } from './globe/lunarTrajectory'
+import { createLunarTrajectory, buildProgressPath, lunarReturns, lunarTripLog, LUNAR_RETURN_NM } from './globe/lunarTrajectory'
 import { createMoonMesh } from './globe/moonMesh'
 import { createLunarCinematic } from './globe/lunarCinematic'
 import { createContrail } from './globe/contrail'
@@ -249,19 +249,23 @@ async function run() {
   let currentMiles = 0
   let lastStats: ReturnType<typeof statsFor> | null = null
   let lunarOn = false, revealRaf = 0
+  // Demo/preview override: ?lunarLaps=2.9 flies the mission as if you'd flown that many lunar
+  // returns, so the multi-lap coil can be shown without the real mileage. No param = real miles.
+  const lunarLapsParam = new URLSearchParams(location.search).get('lunarLaps')
+  const lunarMilesOverride = lunarLapsParam != null ? Math.max(0, parseFloat(lunarLapsParam) || 0) * LUNAR_RETURN_NM : null
+  const lunarMiles = () => lunarMilesOverride ?? currentMiles
   // Build the "fly to your earned spot" progress path from the current miles & Moon position.
   const progressPathNow = () => {
     // Deterministic vantage direction (camera sits at lat 0, lng moonLng+120) orients the coil.
     const camDir = geoToCartesian(0, moon.datum.lng + 120, 0, 100)
-    return buildProgressPath(moon.datum.lat, moon.datum.lng, moon.datum.alt, { laps: lunarReturns(currentMiles), cam: camDir, start: { lat: beacon.pos.lat, lng: beacon.pos.lng } })
+    return buildProgressPath(moon.datum.lat, moon.datum.lng, moon.datum.alt, { laps: lunarReturns(lunarMiles()), cam: camDir, start: { lat: beacon.pos.lat, lng: beacon.pos.lng } })
   }
-  const lunarReadoutText = () => lunarTripLog(currentMiles, lastStats?.hours ?? 0)
   // Rebuild the lunar line + readout + parked "you are here" marker (toggle and every timeline change).
   const refreshLunar = (animate: boolean) => {
     if (missionFlying) return // the cinematic owns the line, reveal, and readout while flying
     const path = progressPathNow()
     lunar.setPath(path)
-    hud.setLunarReadout(lunarReadoutText())
+    hud.setLunarReadout(lunarTripLog(lunarMiles(), lastStats?.hours ?? 0, path))
     // The ship parks at its earned spot; after the flight the gold marker holds that spot.
     lunar.setMarker(path.stopFraction > 0.005 ? path.stopFraction : null)
     cancelAnimationFrame(revealRaf)
@@ -690,7 +694,7 @@ async function run() {
     lunar.setMarker(null) // the flying ship is the "you are here" during the flight
     const mc = scene.globe.getCoords(moon.datum.lat, moon.datum.lng, moon.datum.alt)
     moonMesh.show(mc, new Date(playhead))
-    const ok = await cine.play({ traj: path, moonCenter: mc, stopFraction: path.stopFraction, reachedMoon: path.reachedMoon })
+    const ok = await cine.play({ traj: path, moonCenter: mc, stopFraction: path.stopFraction, metHours: 145.2 * lunarReturns(lunarMiles()) })
     missionFlying = false
     moonMesh.hide()
     applyOcclusion()
@@ -739,7 +743,7 @@ async function run() {
     try {
       const blob = await recordCanvas({
         gl: glCanvas(), width: 1920, height: 1080, fps: 30,
-        totalMs: 1050 + cine.timingFor(progressPathNow().stopFraction).totalMs + 1600, // pad fly-in + flight + settle
+        totalMs: (() => { const p = progressPathNow(); const mc = scene.globe.getCoords(moon.datum.lat, moon.datum.lng, moon.datum.alt); return 1050 + cine.timingFor(p, mc, p.stopFraction).totalMs + 1600 })(), // pad fly-in + flight + settle
         onStart: () => { void startMission() },
         drawFrame: (ctx, w, h, _elapsed, blit) => {
           blit()

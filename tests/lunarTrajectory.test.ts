@@ -6,61 +6,77 @@ const R100 = 100
 const radiusOf = (p: GeoPoint) => R100 * (1 + p.alt)
 
 describe('lunarTripLog', () => {
-  it('sub-1.0: headlines percent to the Moon and reports days aloft', () => {
-    const log = lunarTripLog(89348, 231)
-    expect(log).toContain('89,348 NM flown — 22% of the way to the Moon')
-    expect(log).toContain('0.22 Earth–Moon returns')
+  it('headlines the racetrack position and reports days aloft', () => {
+    const log = lunarTripLog(89348, 231, { lap: 1, segment: 'outbound', legProgress: 0.42 })
+    expect(log).toContain('LAP 1 · OUTBOUND — 42% of the way to the Moon')
+    expect(log).toContain('89,348 NM · 0.22 returns')
     expect(log).toContain('231 block hours — 9.6 days in the air')
     expect(log).toContain('× around the Earth')
   })
 
-  it('past 1.0: headlines to-the-Moon-and-back with the extra percent', () => {
-    const log = lunarTripLog(LUNAR_RETURN_NM * 2.34, 4800)
-    expect(log).toContain('to the Moon & back ×2, +34% again')
-    expect(log).toContain('2.34 Earth–Moon returns')
+  it('inbound and moon segments get their own headlines', () => {
+    expect(lunarTripLog(LUNAR_RETURN_NM * 2.9, 4800, { lap: 3, segment: 'inbound', legProgress: 0.8 }))
+      .toContain('LAP 3 · INBOUND — 80% of the way home')
+    expect(lunarTripLog(LUNAR_RETURN_NM * 2.5, 4800, { lap: 3, segment: 'moon', legProgress: 0.5 }))
+      .toContain('LAP 3 · ROUNDING THE MOON')
   })
 
-  it('exact multiple omits the "+N% again" tail', () => {
-    expect(lunarTripLog(LUNAR_RETURN_NM * 2, 4000)).toContain('to the Moon & back ×2')
-    expect(lunarTripLog(LUNAR_RETURN_NM * 2, 4000)).not.toContain('again')
+  it('falls back to a plain headline without a position', () => {
+    expect(lunarTripLog(LUNAR_RETURN_NM * 2, 4000)).toContain('2.00 Earth–Moon returns')
   })
 })
 
-describe('buildProgressPath (fly to your earned spot)', () => {
+describe('buildProgressPath (the lunar-return racetrack)', () => {
   const moon = { lat: 12, lng: -140, alt: 59.3 }
   const cam = { x: 0, y: 0, z: 100 }
   const start = { lat: 38.17, lng: -85.74 }
+  const build = (laps: number) => buildProgressPath(moon.lat, moon.lng, moon.alt, { laps, cam, start })
 
-  it('sub-1.0 mileage: no laps, stop fraction tracks the transit progress, moon not reached', () => {
-    const p = buildProgressPath(moon.lat, moon.lng, moon.alt, { laps: 0.22, cam, start })
-    expect(p.loopCount).toBe(0)
-    expect(p.reachedMoon).toBe(false)
-    expect(p.stopFraction).toBeCloseTo(0.22, 2) // no loops → path is the outbound, fraction == laps
-    expect(p.points[0].lat).toBeCloseTo(start.lat, 1)
+  it('one circuit = out, around the Moon, and back to Earth', () => {
+    const p = build(1)
+    expect(p.strands).toBe(1)
+    expect(p.stopFraction).toBeCloseTo(1, 5) // a full return ends the circuit back at Earth
+    expect(p.segment).toBe('inbound')
+    expect(Math.max(...p.points.map(radiusOf))).toBeGreaterThan(5900) // reached the Moon
+    const end = p.points[p.points.length - 1]
+    expect(radiusOf(end)).toBeLessThan(130) // ...and came back around Earth (parking altitude)
+    expect(p.points[0].lat).toBeCloseTo(start.lat, 1) // launched from the pad
   })
 
-  it('one full return reaches the Moon at the end of the transit', () => {
-    const p = buildProgressPath(moon.lat, moon.lng, moon.alt, { laps: 1, cam, start })
-    expect(p.loopCount).toBe(0)
-    expect(p.reachedMoon).toBe(true)
-    expect(p.stopFraction).toBeCloseTo(1, 5)
-    expect(Math.max(...p.points.map(radiusOf))).toBeGreaterThan(5900) // out at the Moon (near-side entry ~5985)
+  it('0.21 returns parks mid-outbound on lap 1 (0.5 ≈ reached the Moon)', () => {
+    const p = build(0.21)
+    expect(p.lap).toBe(1)
+    expect(p.segment).toBe('outbound')
+    expect(p.legProgress).toBeGreaterThan(0.2)
+    expect(p.legProgress).toBeLessThan(0.6)
   })
 
-  it('2.34 returns → two laps of headroom, ship parks partway through the second', () => {
-    const p = buildProgressPath(moon.lat, moon.lng, moon.alt, { laps: 2.34, cam, start })
-    expect(p.loopCount).toBe(2)
-    expect(p.reachedMoon).toBe(true)
-    // outLen is 1 return; each loop is one more. 2.34 → outLen + 1.34 loops.
-    const perLoop = (p.length - p.outLen) / 2
-    const expected = (p.outLen + 1.34 * perLoop) / p.length
-    expect(p.stopFraction).toBeCloseTo(expected, 4)
+  it('0.62 returns is already heading home', () => {
+    const p = build(0.62)
+    expect(p.segment).toBe('inbound')
+    expect(p.lap).toBe(1)
+  })
+
+  it('2.34 returns: three strands drawn, parked outbound on lap 3', () => {
+    const p = build(2.34)
+    expect(p.strands).toBe(3)
+    expect(p.lap).toBe(3)
+    expect(p.segment).toBe('outbound')
+    expect(p.stopFraction).toBeGreaterThan(2 / 3) // past two full circuits
     expect(p.stopFraction).toBeLessThan(1)
   })
 
-  it('never dips inside the Earth', () => {
-    const p = buildProgressPath(moon.lat, moon.lng, moon.alt, { laps: 2.5, cam, start })
+  it('careers beyond the drawn cap keep the true lap number', () => {
+    const p = build(20.3)
+    expect(p.strands).toBe(3)
+    expect(p.lap).toBe(21)
+    expect(p.stopFraction).toBeLessThan(1)
+  })
+
+  it('never dips inside the Earth, and the odometer is monotonic', () => {
+    const p = build(2.5)
     for (const pt of p.points) expect(radiusOf(pt)).toBeGreaterThanOrEqual(R100 - 1e-6)
+    for (let i = 1; i < p.cum.length; i++) expect(p.cum[i]).toBeGreaterThanOrEqual(p.cum[i - 1])
   })
 })
 
