@@ -249,9 +249,10 @@ async function run() {
   let currentMiles = 0
   let lastStats: ReturnType<typeof statsFor> | null = null
   let lunarOn = false, revealRaf = 0
-  // Demo/preview override: ?lunarLaps=2.9 flies the mission as if you'd flown that many lunar
-  // returns, so the multi-lap coil can be shown without the real mileage. No param = real miles.
-  const lunarLapsParam = new URLSearchParams(location.search).get('lunarLaps')
+  // DEV-ONLY preview override: ?lunarLaps=2.9 flies the mission as if you'd flown that many
+  // lunar returns, so multi-lap racetracks can be previewed without the real mileage. Compiled
+  // out of production builds (import.meta.env.DEV) — real miles only on the live site.
+  const lunarLapsParam = import.meta.env.DEV ? new URLSearchParams(location.search).get('lunarLaps') : null
   const lunarMilesOverride = lunarLapsParam != null ? Math.max(0, parseFloat(lunarLapsParam) || 0) * LUNAR_RETURN_NM : null
   const lunarMiles = () => lunarMilesOverride ?? currentMiles
   // Build the "fly to your earned spot" progress path from the current miles & Moon position.
