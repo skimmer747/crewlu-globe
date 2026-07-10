@@ -127,6 +127,77 @@ export function buildTrajectoryPoints(moonLat: number, moonLng: number, moonAlt:
   return { points, cum, length: cum[cum.length - 1] }
 }
 
+export interface ProgressPath extends Trajectory { stopFraction: number; reachedMoon: boolean; loopCount: number; outLen: number }
+
+/**
+ * "Fly to your earned spot" path: Earth pad → out to the Moon (this transit spans lunar-returns
+ * 0..1) → `loopCount` coiled laps around the Moon (each lap = one more return). No return-home
+ * leg. `stopFraction` is where `laps` lands along the path; the ship parks there, and the line
+ * reveals bright up to it, faint beyond. loopCount = ceil(laps)-1 (0 below one full return).
+ */
+export function buildProgressPath(
+  moonLat: number, moonLng: number, moonAlt: number,
+  opts: { laps: number; start: { lat: number; lng: number }; cam?: { x: number; y: number; z: number }; R?: number; loopRadius?: number },
+): ProgressPath {
+  const R = opts.R ?? 100
+  const loopRadius = opts.loopRadius ?? 45
+  const laps = Math.max(0, opts.laps)
+  const loopCount = Math.max(0, Math.ceil(laps) - 1) // laps beyond the first arrival
+
+  const mc = geoToCartesian(moonLat, moonLng, moonAlt, R)
+  const M: V3 = [mc.x, mc.y, mc.z]
+  const u = norm(M) // Earth -> Moon
+  let w: V3
+  const cw = opts.cam ? cross(u, norm([opts.cam.x, opts.cam.y, opts.cam.z])) : ([0, 0, 0] as V3)
+  if (opts.cam && mag(cw) > 1e-6) w = norm(cw)
+  else {
+    let v = sub([0, 1, 0], scale(u, dot([0, 1, 0], u)))
+    if (mag(v) < 1e-6) v = sub([1, 0, 0], scale(u, dot([1, 0, 0], u)))
+    v = norm(v); w = norm(cross(u, v))
+  }
+  const n3 = norm(cross(u, w)) // out-of-plane axis for the coil
+
+  const Estart = (() => { const c = geoToCartesian(opts.start.lat, opts.start.lng, 0, R); return [c.x, c.y, c.z] as V3 })()
+  const padDir = norm(Estart)
+  const parkR = R * 1.18
+  const depSurf = norm(add(u, scale(w, -0.03)))
+  const entry: V3 = add(M, scale(u, -loopRadius)) // near-side loop entry (faces Earth)
+
+  const pts: V3[] = []
+  // Outbound: parking-arc climb off the pad, then a straight chord to the Moon entry.
+  const NA = 60, NB = 110
+  for (let i = 0; i < NA; i++) {
+    const t = i / NA
+    const dir = slerpV(padDir, depSurf, smooth01(t))
+    const r = R + (parkR - R) * smooth01(Math.min(1, t * 2.5))
+    pts.push(scale(dir, r))
+  }
+  for (let i = 0; i <= NB; i++) pts.push(lerp(scale(depSurf, parkR), entry, i / NB))
+  const outEndIndex = pts.length - 1
+  // Coiled laps: full circles around the Moon (radius loopRadius in the u–w plane), drifting
+  // along n3 into a spring so multiple laps read as separate passes, not one thick ring.
+  const NLoop = 64
+  const amp = loopRadius * 0.5
+  const steps = loopCount * NLoop
+  for (let s = 1; s <= steps; s++) {
+    const a = (s / NLoop) * 2 * Math.PI
+    const off = (s / Math.max(1, steps)) * amp
+    pts.push(add(add(M, add(scale(u, -loopRadius * Math.cos(a)), scale(w, loopRadius * Math.sin(a)))), scale(n3, off)))
+  }
+
+  const points = pts.map((p) => cartesianToGeo(p, R))
+  const cum = [0]
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + mag(sub(pts[i], pts[i - 1])))
+  const length = cum[cum.length - 1]
+  const outLen = cum[outEndIndex]
+  const perLoop = loopCount > 0 ? (length - outLen) / loopCount : 0
+  // Returns → distance: 0..1 spans the outbound; each further return is one lap.
+  const stopDist = laps <= 1 ? laps * outLen : outLen + (laps - 1) * perLoop
+  const stopFraction = length > 0 ? Math.max(0, Math.min(1, stopDist / length)) : 0
+
+  return { points, cum, length, stopFraction, reachedMoon: laps >= 1, loopCount, outLen }
+}
+
 /** Geo point at a fraction [0..1] of the path's length. */
 export function pointAtFraction(t: Trajectory, fraction: number): GeoPoint {
   const f = Math.max(0, Math.min(1, fraction))
@@ -156,8 +227,10 @@ export interface LunarTrajectory {
  */
 export function createLunarTrajectory(globe: any): LunarTrajectory {
   let traj: Trajectory | null = null
-  let line: any = null
+  let line: any = null   // bright: flown portion, revealed 0..fraction
+  let ghost: any = null  // faint: the full path (miles not yet flown show through beyond the ship)
   const mat = new THREE.LineDashedMaterial({ color: 0x9fe6ff, transparent: true, opacity: 0.95, dashSize: 70, gapSize: 45, depthWrite: false })
+  const ghostMat = new THREE.LineDashedMaterial({ color: 0x9fe6ff, transparent: true, opacity: 0.22, dashSize: 40, gapSize: 60, depthWrite: false })
 
   const indexForFraction = (f: number): number => {
     if (!traj) return 0
@@ -169,6 +242,7 @@ export function createLunarTrajectory(globe: any): LunarTrajectory {
 
   const removeLine = () => {
     if (line) { globe.scene().remove(line); line.geometry.dispose(); line = null }
+    if (ghost) { globe.scene().remove(ghost); ghost.geometry.dispose(); ghost = null }
   }
 
   let marker: any = null
@@ -190,9 +264,16 @@ export function createLunarTrajectory(globe: any): LunarTrajectory {
       traj = t
       const pos: number[] = []
       for (const p of t.points) { const c = globe.getCoords(p.lat, p.lng, p.alt); pos.push(c.x, c.y, c.z) }
+      removeLine()
+      // Faint full path underneath (the miles-not-yet-flown remainder shows through beyond the ship).
+      const gGeom = new THREE.BufferGeometry()
+      gGeom.setAttribute('position', new THREE.Float32BufferAttribute(pos.slice(), 3))
+      ghost = new THREE.Line(gGeom, ghostMat)
+      ghost.computeLineDistances()
+      globe.scene().add(ghost)
+      // Bright flown portion on top, revealed 0..fraction.
       const geom = new THREE.BufferGeometry()
       geom.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-      removeLine()
       line = new THREE.Line(geom, mat)
       line.computeLineDistances()
       line.geometry.setDrawRange(0, 0)

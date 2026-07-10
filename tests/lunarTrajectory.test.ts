@@ -1,6 +1,47 @@
 import { describe, it, expect } from 'vitest'
-import { LUNAR_RETURN_NM, lunarReturns, buildTrajectoryPoints, sliceTrajectory, pointAtFraction } from '../src/globe/lunarTrajectory'
+import { LUNAR_RETURN_NM, lunarReturns, buildTrajectoryPoints, buildProgressPath, sliceTrajectory, pointAtFraction } from '../src/globe/lunarTrajectory'
 import type { GeoPoint } from '../src/globe/lunarTrajectory'
+
+const R100 = 100
+const radiusOf = (p: GeoPoint) => R100 * (1 + p.alt)
+
+describe('buildProgressPath (fly to your earned spot)', () => {
+  const moon = { lat: 12, lng: -140, alt: 59.3 }
+  const cam = { x: 0, y: 0, z: 100 }
+  const start = { lat: 38.17, lng: -85.74 }
+
+  it('sub-1.0 mileage: no laps, stop fraction tracks the transit progress, moon not reached', () => {
+    const p = buildProgressPath(moon.lat, moon.lng, moon.alt, { laps: 0.22, cam, start })
+    expect(p.loopCount).toBe(0)
+    expect(p.reachedMoon).toBe(false)
+    expect(p.stopFraction).toBeCloseTo(0.22, 2) // no loops → path is the outbound, fraction == laps
+    expect(p.points[0].lat).toBeCloseTo(start.lat, 1)
+  })
+
+  it('one full return reaches the Moon at the end of the transit', () => {
+    const p = buildProgressPath(moon.lat, moon.lng, moon.alt, { laps: 1, cam, start })
+    expect(p.loopCount).toBe(0)
+    expect(p.reachedMoon).toBe(true)
+    expect(p.stopFraction).toBeCloseTo(1, 5)
+    expect(Math.max(...p.points.map(radiusOf))).toBeGreaterThan(5900) // out at the Moon (near-side entry ~5985)
+  })
+
+  it('2.34 returns → two laps of headroom, ship parks partway through the second', () => {
+    const p = buildProgressPath(moon.lat, moon.lng, moon.alt, { laps: 2.34, cam, start })
+    expect(p.loopCount).toBe(2)
+    expect(p.reachedMoon).toBe(true)
+    // outLen is 1 return; each loop is one more. 2.34 → outLen + 1.34 loops.
+    const perLoop = (p.length - p.outLen) / 2
+    const expected = (p.outLen + 1.34 * perLoop) / p.length
+    expect(p.stopFraction).toBeCloseTo(expected, 4)
+    expect(p.stopFraction).toBeLessThan(1)
+  })
+
+  it('never dips inside the Earth', () => {
+    const p = buildProgressPath(moon.lat, moon.lng, moon.alt, { laps: 2.5, cam, start })
+    for (const pt of p.points) expect(radiusOf(pt)).toBeGreaterThanOrEqual(R100 - 1e-6)
+  })
+})
 
 describe('lunarReturns', () => {
   it('one round trip = the Earth-Moon return distance', () => {

@@ -1,45 +1,32 @@
 import { describe, it, expect } from 'vitest'
-import { missionStateAt, MISSION_TOTAL_MS, fmtMet } from '../src/globe/lunarCinematic'
+import { missionTiming, shipUAt, fmtMet } from '../src/globe/lunarCinematic'
 
-describe('missionStateAt', () => {
-  it('starts at the pad and ends just short of home', () => {
-    expect(missionStateAt(0).u).toBe(0)
-    expect(missionStateAt(MISSION_TOTAL_MS).u).toBeCloseTo(0.985, 3)
+describe('missionTiming', () => {
+  it('parks-early trips are shorter than full-coil trips', () => {
+    expect(missionTiming(0.2).totalMs).toBeLessThan(missionTiming(1).totalMs)
+    expect(missionTiming(0).flyMs).toBeGreaterThan(0)
+    expect(missionTiming(1).totalMs).toBe(missionTiming(1).flyMs + missionTiming(1).parkMs)
+  })
+})
+
+describe('shipUAt', () => {
+  const stop = 0.22
+  const t = missionTiming(stop)
+
+  it('starts at 0 and reaches exactly the stop fraction, then parks there', () => {
+    expect(shipUAt(0, stop, t)).toBe(0)
+    expect(shipUAt(t.flyMs, stop, t)).toBeCloseTo(stop, 6)
+    expect(shipUAt(t.totalMs, stop, t)).toBeCloseTo(stop, 6) // parked, never overshoots
   })
 
-  it('u is monotonic over the whole flight', () => {
+  it('is monotonic over the flight and never exceeds the stop', () => {
     let prev = -1
-    for (let t = 0; t <= MISSION_TOTAL_MS; t += 50) {
-      const { u } = missionStateAt(t)
+    for (let e = 0; e <= t.totalMs; e += 100) {
+      const u = shipUAt(e, stop, t)
       expect(u).toBeGreaterThanOrEqual(prev)
+      expect(u).toBeLessThanOrEqual(stop + 1e-9)
       prev = u
     }
-  })
-
-  it('crawls the Moon for the near-side + earthrise beats', () => {
-    // 19s–25s of the timeline crawls around the Moon (u ≈ 0.497 → 0.507)
-    expect(missionStateAt(19500).u).toBeGreaterThan(0.49)
-    expect(missionStateAt(24500).u).toBeLessThan(0.51)
-  })
-
-  it('is fully behind the ship a quarter of the way out', () => {
-    // theta ≈ 172+ (chase) from u ≈ 0.12 onward — the camera must not lag the swing
-    // until the ship is already at the Moon.
-    const t = 7500 // end of the settle-behind beat
-    expect(missionStateAt(t).cam.theta).toBeGreaterThan(165)
-    expect(missionStateAt(t).u).toBeLessThan(0.15)
-  })
-
-  it('camera rig stays in sane bounds and ends in chase position', () => {
-    for (let t = 0; t <= MISSION_TOTAL_MS; t += 250) {
-      const { cam } = missionStateAt(t)
-      expect(cam.dist).toBeGreaterThan(10)
-      expect(cam.dist).toBeLessThan(60)
-      expect(cam.theta).toBeGreaterThanOrEqual(0)
-      expect(cam.theta).toBeLessThanOrEqual(180)
-      expect(cam.rise).toBeGreaterThanOrEqual(0)
-    }
-    expect(missionStateAt(MISSION_TOTAL_MS).cam.theta).toBeCloseTo(178, 0)
   })
 })
 

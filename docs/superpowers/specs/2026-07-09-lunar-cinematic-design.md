@@ -22,6 +22,15 @@ existing mission view. The flight is re-recordable as a shareable 1080p video.
   beacon at the point on the 415,119 NM path that career miles have reached.
 - **Extras (all in v1):** Apollo-style telemetry overlay, earthrise held moment,
   Apollo landing-site labels, shareable video export.
+- **Progress model (revised 2026-07-09 per user feedback — supersedes "full loop + marker"):**
+  the flight is now a *fly-to-your-earned-spot* journey. One full lunar return of mileage
+  reaches the Moon; each additional return is one lap around it. The ship flies out along a
+  progress path and **parks at exactly `laps` along it — it does not come home.** Below 1.0
+  return the ship parks in transit with the Moon a distant glowing goal ahead (no close-up
+  yet — that's earned at 1.0). The line draws **bright up to the ship, faint beyond** (miles
+  not yet flown). After the flight the ship hands off to the gold "you are here" marker at the
+  parked spot (dart↔beacon-style). Multi-return laps coil around the Moon. Demo pilot = 0.22
+  returns, so the shipped demo shows the out-and-park-in-transit case.
 - **Camera approach (revised same-day per user feedback):** chase cam. First-person
   proved disorienting in practice ("hard to tell where I am") — the shipped design flies
   a dedicated dart instance (`buildDart()` export from dartLayer, added via

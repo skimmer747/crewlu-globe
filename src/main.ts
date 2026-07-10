@@ -19,7 +19,7 @@ import { createCityLabels } from './globe/cityLabels'
 import { createHud } from './globe/hud'
 import { createTimelineDock, SPEEDS } from './globe/timelineDock'
 import { createPlayback } from './globe/playback'
-import { createLunarTrajectory, buildTrajectoryPoints, lunarReturns, LUNAR_RETURN_NM } from './globe/lunarTrajectory'
+import { createLunarTrajectory, buildProgressPath, lunarReturns, LUNAR_RETURN_NM } from './globe/lunarTrajectory'
 import { createMoonMesh } from './globe/moonMesh'
 import { createLunarCinematic } from './globe/lunarCinematic'
 import { createContrail } from './globe/contrail'
@@ -159,7 +159,6 @@ async function run() {
     moonMesh,
     onFrame: () => { scene.refreshView(); applyOcclusion() },
     onTelemetry: (t) => { cineTelem = t; hud.setLunarReadout(t) },
-    onEvent: (t) => hud.setEvent(t),
     setReveal: (f) => lunar.setReveal(f),
   })
   hud.onCenterTap(() => { scene.globe.controls().autoRotate = false; scene.globe.pointOfView({ lat: beacon.pos.lat, lng: beacon.pos.lng, altitude: 1.7 }, 950) })
@@ -250,21 +249,29 @@ async function run() {
   let currentMiles = 0
   let lastStats: ReturnType<typeof statsFor> | null = null
   let lunarOn = false, revealRaf = 0
-  // Rebuild the lunar line + readout from the current miles & Moon position (called on toggle and on every timeline change).
+  // Build the "fly to your earned spot" progress path from the current miles & Moon position.
+  const progressPathNow = () => {
+    // Deterministic vantage direction (camera sits at lat 0, lng moonLng+120) orients the coil.
+    const camDir = geoToCartesian(0, moon.datum.lng + 120, 0, 100)
+    return buildProgressPath(moon.datum.lat, moon.datum.lng, moon.datum.alt, { laps: lunarReturns(currentMiles), cam: camDir, start: { lat: beacon.pos.lat, lng: beacon.pos.lng } })
+  }
+  const lunarReadoutText = () => {
+    const laps = lunarReturns(currentMiles)
+    const progress = laps < 1 ? `${Math.round(laps * 100)}% TO THE MOON` : `= ${laps.toFixed(2)} LUNAR RETURNS`
+    return `DISTANCE FLOWN  ${Math.round(currentMiles).toLocaleString()} NM\nEARTH–MOON RETURN  ${LUNAR_RETURN_NM.toLocaleString()} NM\n${progress}`
+  }
+  // Rebuild the lunar line + readout + parked "you are here" marker (toggle and every timeline change).
   const refreshLunar = (animate: boolean) => {
     if (missionFlying) return // the cinematic owns the line, reveal, and readout while flying
-    // Orient the swing to face the lunar-return vantage (camera sits at lat 0, lng moonLng+90).
-    // Use that deterministic direction rather than the live camera, which is still mid-fly-in.
-    const camDir = geoToCartesian(0, moon.datum.lng + 120, 0, 100)
-    lunar.setPath(buildTrajectoryPoints(moon.datum.lat, moon.datum.lng, moon.datum.alt, { cam: camDir, start: { lat: beacon.pos.lat, lng: beacon.pos.lng } }))
-    const laps = lunarReturns(currentMiles)
-    hud.setLunarReadout(`DISTANCE FLOWN  ${Math.round(currentMiles).toLocaleString()} NM\nEARTH–MOON RETURN  ${LUNAR_RETURN_NM.toLocaleString()} NM\n= ${laps.toFixed(2)} LUNAR RETURNS`)
-    // Full mission always drawn; the gold marker shows how far the career miles have reached.
-    lunar.setMarker(laps >= 0.01 && laps < 1 ? laps : null)
+    const path = progressPathNow()
+    lunar.setPath(path)
+    hud.setLunarReadout(lunarReadoutText())
+    // The ship parks at its earned spot; after the flight the gold marker holds that spot.
+    lunar.setMarker(path.stopFraction > 0.005 ? path.stopFraction : null)
     cancelAnimationFrame(revealRaf)
-    if (!animate) { lunar.setReveal(1); return }
+    if (!animate) { lunar.setReveal(path.stopFraction); return }
     const t0 = performance.now()
-    const step = (ts: number) => { const f = Math.min(1, (ts - t0) / 1600); lunar.setReveal(f); if (f < 1) revealRaf = requestAnimationFrame(step) }
+    const step = (ts: number) => { const f = Math.min(1, (ts - t0) / 1600); lunar.setReveal(f * path.stopFraction); if (f < 1) revealRaf = requestAnimationFrame(step) }
     revealRaf = requestAnimationFrame(step)
   }
   const draw = (full = true) => {
@@ -668,9 +675,10 @@ async function run() {
     draw()
   })
 
-  // Lunar return: tap flies the full free-return mission (launch from the pilot's position →
-  // around the Moon → home), then settles into the wide mission view with the dashed line and
-  // readout. Reduced-motion keeps the static reveal. Tap again exits, restoring the camera.
+  // Lunar return: tap flies the "fly to your earned spot" mission (launch from the pilot's
+  // position → out along the progress path → park where the miles ran out; it does NOT come
+  // home), then settles into the wide view with the bright/faint line + parked marker.
+  // Reduced-motion keeps the static reveal. Tap again exits, restoring the camera.
   let savedMaxDist = 0, savedPov: any = null
 
   const missionView = (durationMs: number) => {
@@ -680,16 +688,13 @@ async function run() {
 
   const startMission = async (): Promise<boolean> => {
     missionFlying = true
-    const camDir = geoToCartesian(0, moon.datum.lng + 120, 0, 100)
-    const traj = buildTrajectoryPoints(moon.datum.lat, moon.datum.lng, moon.datum.alt, { cam: camDir, start: { lat: beacon.pos.lat, lng: beacon.pos.lng } })
-    lunar.setPath(traj)
+    const path = progressPathNow()
+    lunar.setPath(path)
     lunar.setReveal(0)
-    const laps = lunarReturns(currentMiles)
-    const fraction = laps >= 0.01 && laps < 1 ? laps : null
-    lunar.setMarker(fraction)
+    lunar.setMarker(null) // the flying ship is the "you are here" during the flight
     const mc = scene.globe.getCoords(moon.datum.lat, moon.datum.lng, moon.datum.alt)
     moonMesh.show(mc, new Date(playhead))
-    const ok = await cine.play({ traj, moonCenter: mc, milesFraction: fraction })
+    const ok = await cine.play({ traj: path, moonCenter: mc, stopFraction: path.stopFraction, reachedMoon: path.reachedMoon })
     missionFlying = false
     moonMesh.hide()
     applyOcclusion()
@@ -738,7 +743,7 @@ async function run() {
     try {
       const blob = await recordCanvas({
         gl: glCanvas(), width: 1920, height: 1080, fps: 30,
-        totalMs: 1050 + cine.totalMs + 1600, // pad fly-in + flight + settle into mission view
+        totalMs: 1050 + cine.timingFor(progressPathNow().stopFraction).totalMs + 1600, // pad fly-in + flight + settle
         onStart: () => { void startMission() },
         drawFrame: (ctx, w, h, _elapsed, blit) => {
           blit()
