@@ -1,9 +1,30 @@
 import { describe, it, expect } from 'vitest'
-import { LUNAR_RETURN_NM, lunarReturns, buildTrajectoryPoints, buildProgressPath, sliceTrajectory, pointAtFraction } from '../src/globe/lunarTrajectory'
+import { LUNAR_RETURN_NM, lunarReturns, lunarTripLog, buildTrajectoryPoints, buildProgressPath, sliceTrajectory, pointAtFraction } from '../src/globe/lunarTrajectory'
 import type { GeoPoint } from '../src/globe/lunarTrajectory'
 
 const R100 = 100
 const radiusOf = (p: GeoPoint) => R100 * (1 + p.alt)
+
+describe('lunarTripLog', () => {
+  it('sub-1.0: headlines percent to the Moon and reports days aloft', () => {
+    const log = lunarTripLog(89348, 231)
+    expect(log).toContain('89,348 NM flown — 22% of the way to the Moon')
+    expect(log).toContain('0.22 Earth–Moon returns')
+    expect(log).toContain('231 block hours — 9.6 days in the air')
+    expect(log).toContain('× around the Earth')
+  })
+
+  it('past 1.0: headlines to-the-Moon-and-back with the extra percent', () => {
+    const log = lunarTripLog(LUNAR_RETURN_NM * 2.34, 4800)
+    expect(log).toContain('to the Moon & back ×2, +34% again')
+    expect(log).toContain('2.34 Earth–Moon returns')
+  })
+
+  it('exact multiple omits the "+N% again" tail', () => {
+    expect(lunarTripLog(LUNAR_RETURN_NM * 2, 4000)).toContain('to the Moon & back ×2')
+    expect(lunarTripLog(LUNAR_RETURN_NM * 2, 4000)).not.toContain('again')
+  })
+})
 
 describe('buildProgressPath (fly to your earned spot)', () => {
   const moon = { lat: 12, lng: -140, alt: 59.3 }

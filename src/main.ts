@@ -19,7 +19,7 @@ import { createCityLabels } from './globe/cityLabels'
 import { createHud } from './globe/hud'
 import { createTimelineDock, SPEEDS } from './globe/timelineDock'
 import { createPlayback } from './globe/playback'
-import { createLunarTrajectory, buildProgressPath, lunarReturns, LUNAR_RETURN_NM } from './globe/lunarTrajectory'
+import { createLunarTrajectory, buildProgressPath, lunarReturns, lunarTripLog } from './globe/lunarTrajectory'
 import { createMoonMesh } from './globe/moonMesh'
 import { createLunarCinematic } from './globe/lunarCinematic'
 import { createContrail } from './globe/contrail'
@@ -255,11 +255,7 @@ async function run() {
     const camDir = geoToCartesian(0, moon.datum.lng + 120, 0, 100)
     return buildProgressPath(moon.datum.lat, moon.datum.lng, moon.datum.alt, { laps: lunarReturns(currentMiles), cam: camDir, start: { lat: beacon.pos.lat, lng: beacon.pos.lng } })
   }
-  const lunarReadoutText = () => {
-    const laps = lunarReturns(currentMiles)
-    const progress = laps < 1 ? `${Math.round(laps * 100)}% TO THE MOON` : `= ${laps.toFixed(2)} LUNAR RETURNS`
-    return `DISTANCE FLOWN  ${Math.round(currentMiles).toLocaleString()} NM\nEARTH–MOON RETURN  ${LUNAR_RETURN_NM.toLocaleString()} NM\n${progress}`
-  }
+  const lunarReadoutText = () => lunarTripLog(currentMiles, lastStats?.hours ?? 0)
   // Rebuild the lunar line + readout + parked "you are here" marker (toggle and every timeline change).
   const refreshLunar = (animate: boolean) => {
     if (missionFlying) return // the cinematic owns the line, reveal, and readout while flying

@@ -9,6 +9,38 @@ export function lunarReturns(miles: number): number {
   return miles / LUNAR_RETURN_NM
 }
 
+const EARTH_LAP_NM = 21600  // Earth's equator in NM (mirrors data/career.ts)
+const CRUISE_KT = 485       // widebody cruise TAS (~Mach 0.85)
+const TRANSCON_NM = 2475    // JFK–LAX great circle
+
+/**
+ * The "trip log" shown when the lunar ship parks: how far you went, in fun, personal terms —
+ * days spent aloft, laps of the Earth, transcons, and how a lunar return scales at jet speed.
+ */
+export function lunarTripLog(miles: number, blockHours: number): string {
+  const laps = miles / LUNAR_RETURN_NM
+  const nm = Math.round(miles).toLocaleString()
+  const earthLaps = miles / EARTH_LAP_NM
+  const daysAloft = blockHours / 24
+  const transcons = Math.round(miles / TRANSCON_NM)
+  const returnDaysNonstop = Math.round(LUNAR_RETURN_NM / CRUISE_KT / 24)
+  const whole = Math.floor(laps)
+  const rem = Math.round((laps - whole) * 100)
+
+  const head = laps < 1
+    ? `${nm} NM flown — ${Math.round(laps * 100)}% of the way to the Moon`
+    : `${nm} NM — to the Moon & back ×${whole}${rem >= 2 ? `, +${rem}% again` : ''}`
+
+  return [
+    '◓ LUNAR RETURN · TRIP LOG',
+    head,
+    `${laps.toFixed(2)} Earth–Moon returns · round trip ${LUNAR_RETURN_NM.toLocaleString()} NM`,
+    `${Math.round(blockHours).toLocaleString()} block hours — ${daysAloft.toFixed(1)} days in the air`,
+    `${earthLaps.toFixed(1)}× around the Earth · ${transcons.toLocaleString()} JFK–LAX transcons`,
+    `at jet cruise, a full return is ~${returnDaysNonstop} days nonstop`,
+  ].join('\n')
+}
+
 type V3 = [number, number, number]
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
