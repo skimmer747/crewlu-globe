@@ -1,5 +1,5 @@
 import './styles.css'
-import { supabase } from './supabase'
+import { AUTH_STORAGE_KEY, supabase } from './supabase'
 import { requireSession } from './auth/authView'
 import { signOutHere } from './auth/signOut'
 import { loadAirports } from './data/airports'
@@ -78,7 +78,7 @@ async function run() {
       <p style="color:#9fc4e6;font-size:12px;line-height:1.6">Import your trips in the Crewlu app and they'll appear here on your globe.</p>
       <button id="signout" class="link">Sign out</button>
     </div></div>`
-    app.querySelector('#signout')!.addEventListener('click', async () => { await signOutHere(supabase); location.reload() })
+    app.querySelector('#signout')!.addEventListener('click', async () => { await signOutHere(supabase, AUTH_STORAGE_KEY); location.reload() })
     return
   }
 
@@ -111,7 +111,7 @@ async function run() {
     account,
     onSignOut: demo
       ? () => { window.open('https://crewlu.net', '_blank', 'noopener') }
-      : async () => { await signOutHere(supabase); location.reload() },
+      : async () => { await signOutHere(supabase, AUTH_STORAGE_KEY); location.reload() },
     onSignIn: demo
       ? () => {
           const url = new URL(location.href)
